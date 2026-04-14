@@ -125,6 +125,9 @@ class ImportDeckInput(BaseModel):
     subject_id: str
     cards: List[dict]
 
+class UpdateThemeInput(BaseModel):
+    theme: str  # "light" or "dark"
+
 # ─── APP SETUP ───
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -420,6 +423,78 @@ async def get_progress_stats(request: Request):
         count = await db.user_card_progress.count_documents({"user_id": user_id, "box": box_num})
         box_counts[f"box_{box_num}"] = count
     return {"sessions": sessions, "box_counts": box_counts, "total_sessions": len(sessions)}
+
+# ═══════════════════════════════════════════
+# SUBJECT STATS + LEADERBOARD + THEME
+# ═══════════════════════════════════════════
+@api_router.get("/progress/subject-stats")
+async def get_subject_stats(request: Request):
+    user = await get_current_user(request)
+    user_id = user["_id"]
+    subjects = await db.subjects.find({}, {"_id": 0}).to_list(100)
+    result = []
+    for subj in subjects:
+        sid = subj["id"]
+        sessions = await db.study_sessions.find({"user_id": user_id, "subject_id": sid}, {"_id": 0}).to_list(500)
+        total_sessions = len(sessions)
+        if total_sessions == 0:
+            continue
+        total_correct = sum(s.get("correct_count", 0) for s in sessions)
+        total_cards = sum(s.get("total_cards", 0) for s in sessions)
+        avg_pct = round(sum(s.get("percentage", 0) for s in sessions) / total_sessions) if total_sessions else 0
+        total_xp = sum(s.get("xp_earned", 0) for s in sessions)
+        box_dist = {}
+        for b in [1, 2, 3]:
+            box_dist[f"box_{b}"] = await db.user_card_progress.count_documents({"user_id": user_id, "subject_id": sid, "box": b})
+        total_card_count = await db.flashcards.count_documents({"subject_id": sid})
+        mastered = box_dist.get("box_3", 0)
+        result.append({
+            "subject_id": sid, "name": subj["name"], "color": subj["color"], "icon": subj["icon"],
+            "total_sessions": total_sessions, "total_correct": total_correct,
+            "total_cards_reviewed": total_cards, "avg_percentage": avg_pct,
+            "total_xp": total_xp, "box_distribution": box_dist,
+            "total_cards": total_card_count, "mastered": mastered,
+            "mastery_pct": round((mastered / total_card_count) * 100) if total_card_count else 0,
+        })
+    result.sort(key=lambda x: x["total_sessions"], reverse=True)
+    return {"subject_stats": result}
+
+@api_router.get("/classes/{class_id}/leaderboard")
+async def get_class_leaderboard(class_id: str, request: Request):
+    user = await get_current_user(request)
+    cls = await db.classes.find_one({"id": class_id})
+    if not cls:
+        raise HTTPException(status_code=404, detail="Classe introuvable")
+    member_ids = [m["user_id"] for m in cls.get("members", [])]
+    if user["_id"] not in member_ids:
+        raise HTTPException(status_code=403, detail="Accès refusé")
+    leaderboard = []
+    for member in cls.get("members", []):
+        uid = member["user_id"]
+        u = await db.users.find_one({"_id": ObjectId(uid)})
+        if not u:
+            continue
+        session_count = await db.study_sessions.count_documents({"user_id": uid})
+        sessions = await db.study_sessions.find({"user_id": uid}, {"_id": 0}).to_list(500)
+        avg_pct = round(sum(s.get("percentage", 0) for s in sessions) / len(sessions)) if sessions else 0
+        leaderboard.append({
+            "user_id": uid, "name": u["name"],
+            "xp": u.get("xp", 0), "level": u.get("level", 1),
+            "streak": u.get("streak_count", 0), "sessions": session_count,
+            "avg_score": avg_pct,
+        })
+    leaderboard.sort(key=lambda x: x["xp"], reverse=True)
+    for i, entry in enumerate(leaderboard):
+        entry["rank"] = i + 1
+    return {"leaderboard": leaderboard}
+
+@api_router.put("/user/theme")
+async def update_theme(input: UpdateThemeInput, request: Request):
+    user = await get_current_user(request)
+    if input.theme not in ["light", "dark"]:
+        raise HTTPException(status_code=400, detail="Thème invalide")
+    await db.users.update_one({"_id": ObjectId(user["_id"])}, {"$set": {"theme": input.theme}})
+    return {"theme": input.theme}
 
 # ═══════════════════════════════════════════
 # CLASS ROUTES (Mode Classe)

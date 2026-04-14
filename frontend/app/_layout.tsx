@@ -1,11 +1,15 @@
 import { Stack } from 'expo-router';
-import { AuthProvider } from '../src/context/AuthContext';
+import { AuthProvider, useAuth } from '../src/context/AuthContext';
+import { ThemeProvider } from '../src/context/ThemeContext';
 import { StatusBar } from 'expo-status-bar';
 
-export default function RootLayout() {
+function InnerLayout() {
+  const { user } = useAuth();
+  const themePref = (user as any)?.theme || 'light';
+
   return (
-    <AuthProvider>
-      <StatusBar style="dark" />
+    <ThemeProvider initialTheme={themePref as any}>
+      <StatusBar style={themePref === 'dark' ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
@@ -14,6 +18,14 @@ export default function RootLayout() {
         <Stack.Screen name="class" />
         <Stack.Screen name="create-card" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
       </Stack>
+    </ThemeProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <AuthProvider>
+      <InnerLayout />
     </AuthProvider>
   );
 }
