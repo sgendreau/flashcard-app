@@ -113,6 +113,8 @@ class UpdateNotificationInput(BaseModel):
 
 class CreateClassInput(BaseModel):
     name: str
+    is_private: bool = False
+    locked_grade: Optional[str] = None
 
 class JoinClassInput(BaseModel):
     code: str
@@ -127,6 +129,8 @@ class ImportDeckInput(BaseModel):
 
 class UpdateThemeInput(BaseModel):
     theme: str  # "light" or "dark"
+
+DAILY_REWARD_XP = [25, 50, 75, 100, 150, 200, 300]  # Day 1-7 cycle
 
 # ─── APP SETUP ───
 app = FastAPI()
@@ -147,6 +151,7 @@ async def register(input: RegisterInput):
         "xp": 0, "level": 1, "streak_count": 0,
         "last_study_date": None, "badges": [],
         "grade_level": None, "notification_enabled": True, "notification_hour": 18,
+        "reward_day": 0, "last_reward_date": None,
         "created_at": datetime.now(timezone.utc),
     }
     result = await db.users.insert_one(user_doc)
@@ -497,6 +502,79 @@ async def update_theme(input: UpdateThemeInput, request: Request):
     return {"theme": input.theme}
 
 # ═══════════════════════════════════════════
+# DAILY REWARDS
+# ═══════════════════════════════════════════
+@api_router.get("/rewards/daily")
+async def get_daily_reward(request: Request):
+    user = await get_current_user(request)
+    user_doc = await db.users.find_one({"_id": ObjectId(user["_id"])})
+    today = datetime.now(timezone.utc).date()
+    last_reward = user_doc.get("last_reward_date")
+    reward_day = user_doc.get("reward_day", 0)
+
+    already_claimed = False
+    if last_reward:
+        lr_date = last_reward.date() if isinstance(last_reward, datetime) else last_reward
+        already_claimed = lr_date == today
+        diff = (today - lr_date).days
+        if diff > 1:
+            reward_day = 0  # Reset cycle if missed a day
+
+    next_day = (reward_day % 7)
+    next_xp = DAILY_REWARD_XP[next_day]
+
+    # Check if user studied today
+    studied_today = await db.study_sessions.find_one({
+        "user_id": user["_id"],
+        "completed_at": {"$gte": datetime(today.year, today.month, today.day, tzinfo=timezone.utc)}
+    })
+
+    return {
+        "already_claimed": already_claimed,
+        "can_claim": bool(studied_today) and not already_claimed,
+        "reward_day": next_day + 1,
+        "reward_xp": next_xp,
+        "studied_today": bool(studied_today),
+        "all_rewards": [{"day": i + 1, "xp": xp, "claimed": i < reward_day if not already_claimed else i <= reward_day} for i, xp in enumerate(DAILY_REWARD_XP)],
+    }
+
+@api_router.post("/rewards/claim")
+async def claim_daily_reward(request: Request):
+    user = await get_current_user(request)
+    user_doc = await db.users.find_one({"_id": ObjectId(user["_id"])})
+    today = datetime.now(timezone.utc).date()
+    last_reward = user_doc.get("last_reward_date")
+    reward_day = user_doc.get("reward_day", 0)
+
+    if last_reward:
+        lr_date = last_reward.date() if isinstance(last_reward, datetime) else last_reward
+        if lr_date == today:
+            raise HTTPException(status_code=400, detail="Récompense déjà réclamée aujourd'hui")
+        if (today - lr_date).days > 1:
+            reward_day = 0
+
+    studied = await db.study_sessions.find_one({
+        "user_id": user["_id"],
+        "completed_at": {"$gte": datetime(today.year, today.month, today.day, tzinfo=timezone.utc)}
+    })
+    if not studied:
+        raise HTTPException(status_code=400, detail="Complète une session d'étude d'abord !")
+
+    xp_reward = DAILY_REWARD_XP[reward_day % 7]
+    new_day = (reward_day % 7) + 1
+    new_xp = user_doc.get("xp", 0) + xp_reward
+    new_level = (new_xp // 500) + 1
+
+    await db.users.update_one(
+        {"_id": ObjectId(user["_id"])},
+        {"$set": {
+            "xp": new_xp, "level": new_level,
+            "reward_day": new_day, "last_reward_date": datetime.now(timezone.utc),
+        }}
+    )
+    return {"xp_earned": xp_reward, "reward_day": new_day, "total_xp": new_xp, "new_level": new_level}
+
+# ═══════════════════════════════════════════
 # CLASS ROUTES (Mode Classe)
 # ═══════════════════════════════════════════
 @api_router.post("/classes")
@@ -507,6 +585,7 @@ async def create_class(input: CreateClassInput, request: Request):
         code = generate_class_code()
     class_doc = {
         "id": str(ObjectId()), "name": input.name.strip(), "code": code,
+        "is_private": input.is_private, "locked_grade": input.locked_grade,
         "created_by": user["_id"], "created_by_name": user["name"],
         "members": [{"user_id": user["_id"], "name": user["name"], "role": "admin"}],
         "created_at": datetime.now(timezone.utc),
@@ -525,6 +604,9 @@ async def join_class(input: JoinClassInput, request: Request):
     member_ids = [m["user_id"] for m in cls.get("members", [])]
     if user["_id"] in member_ids:
         raise HTTPException(status_code=400, detail="Tu fais déjà partie de cette classe")
+    # Check grade lock
+    if cls.get("locked_grade") and user.get("grade_level") != cls["locked_grade"]:
+        raise HTTPException(status_code=403, detail=f"Cette classe est réservée au niveau {cls['locked_grade']}")
     await db.classes.update_one(
         {"code": input.code.upper().strip()},
         {"$push": {"members": {"user_id": user["_id"], "name": user["name"], "role": "member"}}}

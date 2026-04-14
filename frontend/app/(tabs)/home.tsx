@@ -60,6 +60,27 @@ export default function HomeScreen() {
     fetchData(n);
   };
 
+  // Daily reward state
+  const [reward, setReward] = useState<any>(null);
+  const [claimingReward, setClaimingReward] = useState(false);
+
+  const fetchReward = async () => {
+    try { const r = await api.get('/rewards/daily'); setReward(r); } catch {}
+  };
+
+  useFocusEffect(useCallback(() => { fetchReward(); }, []));
+
+  const claimReward = async () => {
+    setClaimingReward(true);
+    try {
+      const data = await api.post('/rewards/claim');
+      Alert.alert('Récompense !', `+${data.xp_earned} XP gagnés !`);
+      setReward((r: any) => r ? { ...r, already_claimed: true, can_claim: false } : r);
+      await refreshUser();
+    } catch (e: any) { Alert.alert('Info', e.message); }
+    finally { setClaimingReward(false); }
+  };
+
   const handleExport = async (sid: string, name: string) => {
     try {
       const data = await api.get(`/export/${sid}`);
@@ -116,6 +137,41 @@ export default function HomeScreen() {
             <View style={[styles.progressFill, { width: `${((user?.xp || 0) % 500) / 5}%` }]} />
           </View>
         </View>
+
+        {/* Daily Reward Banner */}
+        {reward && !reward.already_claimed && (
+          <View style={[styles.rewardCard, { backgroundColor: colors.warningBg, borderColor: colors.warning }]} testID="daily-reward-banner">
+            <View style={styles.rewardLeft}>
+              <Ionicons name="gift" size={28} color={colors.warning} />
+              <View style={styles.rewardInfo}>
+                <Text style={[styles.rewardTitle, { color: colors.text }]}>
+                  Récompense Jour {reward.reward_day}
+                </Text>
+                <Text style={[styles.rewardDesc, { color: colors.textSecondary }]}>
+                  {reward.can_claim ? `+${reward.reward_xp} XP à réclamer !` : 'Étudie pour débloquer'}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              testID="claim-reward-btn"
+              style={[styles.rewardBtn, { backgroundColor: reward.can_claim ? colors.warning : colors.border }]}
+              onPress={claimReward}
+              disabled={!reward.can_claim || claimingReward}
+            >
+              <Text style={[styles.rewardBtnText, { color: reward.can_claim ? '#fff' : colors.textMuted }]}>
+                {claimingReward ? '...' : reward.can_claim ? 'Réclamer' : 'Verrouillé'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {reward?.already_claimed && (
+          <View style={[styles.rewardClaimedCard, { backgroundColor: colors.successBg }]} testID="daily-reward-claimed">
+            <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+            <Text style={[styles.rewardClaimedText, { color: colors.success }]}>
+              Récompense du jour réclamée !
+            </Text>
+          </View>
+        )}
 
         {/* Grade chips */}
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Filtre par niveau</Text>
@@ -213,6 +269,18 @@ const styles = StyleSheet.create({
   quizBtnText: { fontSize: 11, fontWeight: '700' },
   exportSmallBtn: { position: 'absolute', top: 12, right: 12, width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   emptyText: { fontSize: 15, textAlign: 'center', paddingVertical: 32 },
+  rewardCard: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 2,
+  },
+  rewardLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  rewardInfo: { flex: 1 },
+  rewardTitle: { fontSize: 16, fontWeight: '700' },
+  rewardDesc: { fontSize: 12, marginTop: 2 },
+  rewardBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
+  rewardBtnText: { fontSize: 13, fontWeight: '700' },
+  rewardClaimedCard: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, padding: 12, marginBottom: 16 },
+  rewardClaimedText: { fontSize: 14, fontWeight: '600' },
   fab: {
     position: 'absolute', bottom: 24, right: 24, width: 60, height: 60, borderRadius: 30,
     alignItems: 'center', justifyContent: 'center',
