@@ -1,0 +1,136 @@
+{
+  "theme": "LIGHT",
+  "archetype": "6 (Vibrant Play)",
+  "design_philosophy": "Educational gamification for students (11-18 years old). The app must feel approachable, energetic, and rewarding, utilizing a modern neo-brutalist soft look (chunky borders, solid drop shadows, and vibrant subject-specific colors) to encourage daily study habits.",
+  "typography": {
+    "primary_font": "System (Platform default: San Francisco on iOS, Roboto on Android)",
+    "scale": {
+      "h1": { "fontSize": 32, "fontWeight": "900", "letterSpacing": 0.5 },
+      "h2": { "fontSize": 24, "fontWeight": "800", "letterSpacing": 0.25 },
+      "h3": { "fontSize": 20, "fontWeight": "700" },
+      "body_large": { "fontSize": 18, "fontWeight": "600" },
+      "body": { "fontSize": 16, "fontWeight": "400", "lineHeight": 24 },
+      "body_small": { "fontSize": 14, "fontWeight": "500" },
+      "caption": { "fontSize": 12, "fontWeight": "600", "textTransform": "uppercase", "letterSpacing": 1 }
+    }
+  },
+  "colors": {
+    "background": "#F4F6F8",
+    "surface": "#FFFFFF",
+    "text_primary": "#1F2937",
+    "text_secondary": "#6B7280",
+    "border": "#E5E7EB",
+    "actions": {
+      "primary": "#FF6B35",
+      "primary_active": "#E85D2A",
+      "secondary": "#2AB7CA",
+      "success": "#10B981",
+      "error": "#EF4444",
+      "warning": "#F59E0B"
+    },
+    "gamification": {
+      "xp": "#FBBF24",
+      "streak": "#FF5A00",
+      "level_badge": "#3B82F6"
+    },
+    "subjects": {
+      "Maths": "#2563EB",
+      "Français": "#E11D48",
+      "Histoire-Géo": "#D97706",
+      "SVT": "#16A34A",
+      "Physique-Chimie": "#0891B2",
+      "Anglais": "#EA580C",
+      "Philosophie": "#475569",
+      "SES": "#059669",
+      "Espagnol": "#DC2626"
+    }
+  },
+  "layout": {
+    "spacing": {
+      "xs": 4,
+      "sm": 8,
+      "md": 16,
+      "lg": 24,
+      "xl": 32,
+      "xxl": 48
+    },
+    "radii": {
+      "sm": 8,
+      "md": 16,
+      "lg": 24,
+      "full": 9999
+    },
+    "shadows": {
+      "card": {
+        "shadowColor": "#000",
+        "shadowOffset": { "width": 0, "height": 4 },
+        "shadowOpacity": 0.05,
+        "shadowRadius": 12,
+        "elevation": 3
+      },
+      "gamified_button": {
+        "shadowColor": "#000",
+        "shadowOffset": { "width": 0, "height": 6 },
+        "shadowOpacity": 0.1,
+        "shadowRadius": 0,
+        "elevation": 4
+      }
+    }
+  },
+  "components": {
+    "flashcard": {
+      "height": 400,
+      "backgroundColor": "#FFFFFF",
+      "borderRadius": 24,
+      "borderWidth": 2,
+      "borderColor": "#E5E7EB",
+      "padding": 24,
+      "alignItems": "center",
+      "justifyContent": "center"
+    },
+    "subject_card": {
+      "borderRadius": 20,
+      "padding": 16,
+      "flexDirection": "row",
+      "alignItems": "center",
+      "justifyContent": "space-between"
+    },
+    "button_primary": {
+      "backgroundColor": "#FF6B35",
+      "borderRadius": 16,
+      "paddingVertical": 16,
+      "paddingHorizontal": 24,
+      "alignItems": "center",
+      "justifyContent": "center"
+    },
+    "leitner_box": {
+      "borderRadius": 12,
+      "padding": 12,
+      "flex": 1,
+      "alignItems": "center"
+    }
+  },
+  "motion": {
+    "card_flip": "Use Reanimated or Animated API. Interpolate rotateY from '0deg' to '180deg'. Back face must have backfaceVisibility: 'hidden' and absolute positioning.",
+    "button_press": "Scale down to 0.95 on press in, spring back to 1 on press out."
+  },
+  "icons": {
+    "library": "@expo/vector-icons",
+    "sets_recommended": ["Feather", "Ionicons", "FontAwesome5"],
+    "usage": "Use bold, rounded icons to match the playful gamified theme."
+  },
+  "image_urls": [
+    {
+      "url": "https://images.unsplash.com/photo-1605462979380-48f1ea3b3ff1?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzV8MHwxfHNlYXJjaHwxfHxzdHVkZW50JTIwc3R1ZHlpbmclMjB0YWJsZXR8ZW58MHx8fHwxNzc2MTc4NzYzfDA&ixlib=rb-4.1.0&q=85",
+      "description": "Student studying, can be used for onboarding or motivation screens",
+      "category": "onboarding"
+    }
+  ],
+  "instructions_to_main_agent": [
+    "CRITICAL: This is a React Native Expo application. DO NOT use tailwindcss classes, DO NOT use HTML tags (div, span, etc.), and DO NOT use shadcn/ui. Use ONLY React Native components (View, Text, TouchableOpacity, ScrollView) and StyleSheet.create().",
+    "Implement the Leitner system logic (3 boxes) in the study session state.",
+    "Cards should display the opposite side of their last review, or definition first if new.",
+    "Implement a streak/XP tracker visible on the Home Screen.",
+    "Add 'data-testid' equivalent for React Native: use 'testID' prop for all interactive and key informational elements."
+  ]
+}
