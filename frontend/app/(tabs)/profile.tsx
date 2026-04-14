@@ -1,21 +1,26 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl, ActivityIndicator,
+  View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl,
+  ActivityIndicator, Alert, Switch, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { api } from '../../src/utils/api';
+import * as Notifications from 'expo-notifications';
+
+const GRADE_LABELS: Record<string, string> = {
+  '6eme': '6ème', '5eme': '5ème', '4eme': '4ème', '3eme': '3ème',
+  '2nde': '2nde', '1ere': '1ère', 'terminale': 'Terminale',
+};
 
 const BADGE_COLORS: Record<string, string> = {
-  'rocket-outline': '#3B82F6',
-  'star-outline': '#FBBF24',
-  'flame-outline': '#FF5A00',
-  'medal-outline': '#10B981',
-  'trophy-outline': '#8B5CF6',
-  'school-outline': '#EC4899',
+  'rocket-outline': '#3B82F6', 'star-outline': '#FBBF24', 'flame-outline': '#FF5A00',
+  'medal-outline': '#10B981', 'trophy-outline': '#8B5CF6', 'school-outline': '#EC4899',
 };
+
+const ALL_GRADES = ['6eme', '5eme', '4eme', '3eme', '2nde', '1ere', 'terminale'];
 
 export default function ProfileScreen() {
   const { user, logout, refreshUser } = useAuth();
@@ -23,27 +28,58 @@ export default function ProfileScreen() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [notifEnabled, setNotifEnabled] = useState(user?.notification_enabled ?? true);
 
   const fetchStats = async () => {
     try {
       await refreshUser();
       const data = await api.get('/progress/stats');
       setStats(data);
-    } catch (e) {
-      console.log('Error:', e);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+    } catch (e) { console.log('Error:', e); }
+    finally { setLoading(false); setRefreshing(false); }
   };
 
-  useFocusEffect(useCallback(() => { fetchStats(); }, []));
+  useFocusEffect(useCallback(() => {
+    fetchStats();
+    setNotifEnabled(user?.notification_enabled ?? true);
+  }, []));
 
   const onRefresh = () => { setRefreshing(true); fetchStats(); };
 
-  const handleLogout = async () => {
-    await logout();
-    router.replace('/(auth)/login');
+  const handleLogout = async () => { await logout(); router.replace('/(auth)/login'); };
+
+  const setGrade = async (grade: string | null) => {
+    try {
+      await api.put('/user/grade', { grade_level: grade });
+      await refreshUser();
+    } catch (e: any) { Alert.alert('Erreur', e.message); }
+  };
+
+  const toggleNotifications = async (value: boolean) => {
+    setNotifEnabled(value);
+    try {
+      if (value) {
+        const { status } = await Notifications.requestPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission refusée', 'Active les notifications dans les paramètres.');
+          setNotifEnabled(false);
+          return;
+        }
+        await Notifications.cancelAllScheduledNotificationsAsync();
+        const hour = user?.notification_hour || 18;
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: "N'oublie pas de réviser !",
+            body: 'Maintiens ton streak en faisant une session de flashcards.',
+          },
+          trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour, minute: 0 },
+        });
+      } else {
+        await Notifications.cancelAllScheduledNotificationsAsync();
+      }
+      await api.put('/user/notifications', { notification_enabled: value, notification_hour: user?.notification_hour || 18 });
+      await refreshUser();
+    } catch (e: any) { console.log('Notif error:', e); }
   };
 
   if (loading) {
@@ -71,7 +107,7 @@ export default function ProfileScreen() {
           <Text style={styles.email} testID="profile-email">{user?.email}</Text>
         </View>
 
-        {/* Stats Cards */}
+        {/* Stats */}
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
             <Ionicons name="star" size={24} color="#FBBF24" />
@@ -92,11 +128,54 @@ export default function ProfileScreen() {
 
         {/* Level Progress */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Progression vers le niveau {(user?.level || 1) + 1}</Text>
+          <Text style={styles.cardTitle}>Progression niveau {(user?.level || 1) + 1}</Text>
           <View style={styles.progressBg}>
             <View style={[styles.progressFill, { width: `${xpProgress}%` }]} />
           </View>
           <Text style={styles.progressText}>{(user?.xp || 0) % 500} / 500 XP</Text>
+        </View>
+
+        {/* Grade Selector */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Mon niveau scolaire</Text>
+          <View style={styles.gradeGrid}>
+            <TouchableOpacity
+              testID="grade-none"
+              style={[styles.gradeBtn, !user?.grade_level && styles.gradeBtnActive]}
+              onPress={() => setGrade(null)}
+            >
+              <Text style={[styles.gradeBtnText, !user?.grade_level && styles.gradeBtnTextActive]}>Tous</Text>
+            </TouchableOpacity>
+            {ALL_GRADES.map((g) => (
+              <TouchableOpacity
+                key={g}
+                testID={`grade-select-${g}`}
+                style={[styles.gradeBtn, user?.grade_level === g && styles.gradeBtnActive]}
+                onPress={() => setGrade(g)}
+              >
+                <Text style={[styles.gradeBtnText, user?.grade_level === g && styles.gradeBtnTextActive]}>
+                  {GRADE_LABELS[g]}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Notifications */}
+        <View style={styles.card}>
+          <View style={styles.notifRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cardTitle}>Rappels de streak</Text>
+              <Text style={styles.notifDesc}>Notification quotidienne à 18h</Text>
+            </View>
+            <Switch
+              testID="notif-toggle"
+              value={notifEnabled}
+              onValueChange={toggleNotifications}
+              trackColor={{ false: '#E5E7EB', true: '#FF6B35' }}
+              thumbColor="#fff"
+            />
+          </View>
         </View>
 
         {/* Leitner Boxes */}
@@ -136,24 +215,23 @@ export default function ProfileScreen() {
                     <Ionicons name={badge.icon as any} size={24} color={BADGE_COLORS[badge.icon] || '#3B82F6'} />
                   </View>
                   <Text style={styles.badgeName}>{badge.name}</Text>
-                  <Text style={styles.badgeDesc}>{badge.description}</Text>
                 </View>
               ))}
             </View>
           )}
         </View>
 
-        {/* Sessions History */}
+        {/* Sessions */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Sessions récentes</Text>
           {(stats?.sessions || []).length === 0 ? (
-            <Text style={styles.emptyText}>Aucune session pour l'instant</Text>
+            <Text style={styles.emptyText}>Aucune session</Text>
           ) : (
             (stats?.sessions || []).slice(0, 5).map((s: any, i: number) => (
               <View key={i} style={styles.sessionItem}>
                 <View style={styles.sessionLeft}>
                   <Text style={styles.sessionPerc}>{s.percentage}%</Text>
-                  <Text style={styles.sessionDetail}>{s.correct_count}/{s.total_cards} correct</Text>
+                  <Text style={styles.sessionDetail}>{s.correct_count}/{s.total_cards}</Text>
                 </View>
                 <Text style={styles.sessionXP}>+{s.xp_earned} XP</Text>
               </View>
@@ -161,7 +239,6 @@ export default function ProfileScreen() {
           )}
         </View>
 
-        {/* Logout */}
         <TouchableOpacity testID="logout-btn" style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
           <Ionicons name="log-out-outline" size={20} color="#EF4444" />
           <Text style={styles.logoutText}>Se déconnecter</Text>
@@ -176,10 +253,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   scroll: { padding: 20, paddingBottom: 40 },
   profileHeader: { alignItems: 'center', marginBottom: 24 },
-  avatar: {
-    width: 80, height: 80, borderRadius: 40, backgroundColor: '#FF6B35',
-    alignItems: 'center', justifyContent: 'center', marginBottom: 12,
-  },
+  avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#FF6B35', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   avatarText: { fontSize: 32, fontWeight: '900', color: '#fff' },
   name: { fontSize: 24, fontWeight: '800', color: '#1F2937' },
   email: { fontSize: 14, color: '#6B7280', marginTop: 4 },
@@ -198,6 +272,13 @@ const styles = StyleSheet.create({
   progressBg: { height: 10, backgroundColor: '#E5E7EB', borderRadius: 5 },
   progressFill: { height: 10, backgroundColor: '#FF6B35', borderRadius: 5 },
   progressText: { fontSize: 13, color: '#6B7280', marginTop: 8, textAlign: 'right' },
+  gradeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  gradeBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14, borderWidth: 2, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' },
+  gradeBtnActive: { backgroundColor: '#FF6B35', borderColor: '#FF6B35' },
+  gradeBtnText: { fontSize: 14, fontWeight: '600', color: '#1F2937' },
+  gradeBtnTextActive: { color: '#fff' },
+  notifRow: { flexDirection: 'row', alignItems: 'center' },
+  notifDesc: { fontSize: 13, color: '#6B7280', marginTop: -8 },
   boxesRow: { flexDirection: 'row', gap: 10 },
   leitnerBox: { flex: 1, borderRadius: 14, padding: 14, alignItems: 'center', gap: 4 },
   boxCount: { fontSize: 22, fontWeight: '900', color: '#1F2937' },
@@ -206,7 +287,6 @@ const styles = StyleSheet.create({
   badgeItem: { width: '30%', alignItems: 'center' },
   badgeIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
   badgeName: { fontSize: 12, fontWeight: '700', color: '#1F2937', textAlign: 'center' },
-  badgeDesc: { fontSize: 10, color: '#6B7280', textAlign: 'center' },
   emptyText: { fontSize: 14, color: '#9CA3AF', textAlign: 'center', paddingVertical: 16 },
   sessionItem: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',

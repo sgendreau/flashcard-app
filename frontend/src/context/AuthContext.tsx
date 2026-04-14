@@ -12,6 +12,9 @@ interface User {
   streak_count: number;
   badges: any[];
   role: string;
+  grade_level: string | null;
+  notification_enabled: boolean;
+  notification_hour: number;
 }
 
 interface AuthContextType {
@@ -44,9 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         await AsyncStorage.multiRemove(['access_token', 'refresh_token']);
       }
-    } catch {
-      // Network error
-    } finally {
+    } catch { /* Network error */ } finally {
       setLoading(false);
     }
   };
@@ -82,7 +83,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     await AsyncStorage.multiRemove(['access_token', 'refresh_token']);
     setUser(null);
-    // Navigation handled by the component calling logout
   };
 
   const refreshUser = async () => {

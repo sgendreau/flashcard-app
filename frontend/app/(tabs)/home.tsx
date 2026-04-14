@@ -1,57 +1,99 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl, ActivityIndicator,
+  View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl,
+  ActivityIndicator, Alert, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { api } from '../../src/utils/api';
+import * as Clipboard from 'expo-clipboard';
 
 const SUBJECT_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
-  'calculator-outline': 'calculator-outline',
-  'book-outline': 'book-outline',
-  'earth-outline': 'earth-outline',
-  'leaf-outline': 'leaf-outline',
-  'flask-outline': 'flask-outline',
-  'language-outline': 'language-outline',
-  'bulb-outline': 'bulb-outline',
-  'trending-up-outline': 'trending-up-outline',
+  'calculator-outline': 'calculator-outline', 'book-outline': 'book-outline',
+  'earth-outline': 'earth-outline', 'leaf-outline': 'leaf-outline',
+  'flask-outline': 'flask-outline', 'language-outline': 'language-outline',
+  'bulb-outline': 'bulb-outline', 'trending-up-outline': 'trending-up-outline',
   'sunny-outline': 'sunny-outline',
 };
 
+const GRADE_LABELS: Record<string, string> = {
+  '6eme': '6ème', '5eme': '5ème', '4eme': '4ème', '3eme': '3ème',
+  '2nde': '2nde', '1ere': '1ère', 'terminale': 'Term.',
+};
+
 interface Subject {
-  id: string;
-  name: string;
-  icon: string;
-  color: string;
-  description: string;
-  card_count: number;
+  id: string; name: string; icon: string; color: string;
+  description: string; card_count: number;
 }
 
 export default function HomeScreen() {
   const { user, refreshUser } = useAuth();
   const router = useRouter();
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [gradeFilter, setGradeFilter] = useState<string | null>(null);
+  const [allGrades, setAllGrades] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchData = async () => {
+  const fetchData = async (grade?: string | null) => {
     try {
-      const data = await api.get('/subjects');
+      const gradeParam = grade !== undefined ? grade : gradeFilter;
+      const url = gradeParam ? `/subjects?grade=${gradeParam}` : '/subjects';
+      const data = await api.get(url);
       setSubjects(data.subjects || []);
+      if (data.grade_levels) setAllGrades(data.grade_levels);
       await refreshUser();
     } catch (e) {
-      console.log('Error fetching subjects:', e);
+      console.log('Error:', e);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  useFocusEffect(useCallback(() => { fetchData(); }, []));
+  useFocusEffect(useCallback(() => {
+    setGradeFilter(user?.grade_level || null);
+    fetchData(user?.grade_level || null);
+  }, [user?.grade_level]));
 
   const onRefresh = () => { setRefreshing(true); fetchData(); };
+
+  const toggleGrade = (g: string) => {
+    const newGrade = gradeFilter === g ? null : g;
+    setGradeFilter(newGrade);
+    setLoading(true);
+    fetchData(newGrade);
+  };
+
+  const handleExport = async (subjectId: string, subjectName: string) => {
+    try {
+      const data = await api.get(`/export/${subjectId}`);
+      const json = JSON.stringify(data.export, null, 2);
+      await Clipboard.setStringAsync(json);
+      Alert.alert('Exporté !', `Le deck "${subjectName}" a été copié dans le presse-papier.`);
+    } catch (e: any) {
+      Alert.alert('Erreur', e.message);
+    }
+  };
+
+  const handleImport = async () => {
+    try {
+      const text = await Clipboard.getStringAsync();
+      if (!text) { Alert.alert('Erreur', 'Le presse-papier est vide'); return; }
+      const parsed = JSON.parse(text);
+      if (!parsed.cards || !parsed.subject_id) {
+        Alert.alert('Erreur', 'Format de deck invalide');
+        return;
+      }
+      const data = await api.post('/import', { subject_id: parsed.subject_id, cards: parsed.cards });
+      Alert.alert('Importé !', `${data.imported} cartes importées.`);
+      fetchData();
+    } catch {
+      Alert.alert('Erreur', 'Format JSON invalide dans le presse-papier');
+    }
+  };
 
   if (loading) {
     return (
@@ -97,42 +139,68 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Subjects */}
-        <Text style={styles.sectionTitle}>Choisis ta matière</Text>
-        <View style={styles.subjectsGrid}>
-          {subjects.map((subject) => (
+        {/* Grade Filter */}
+        <Text style={styles.sectionTitle}>Filtre par niveau</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.gradeScroll}>
+          {allGrades.map((g) => (
             <TouchableOpacity
-              key={subject.id}
-              testID={`subject-card-${subject.id}`}
-              style={[styles.subjectCard, { borderLeftColor: subject.color, borderLeftWidth: 4 }]}
-              onPress={() => router.push(`/study/${subject.id}`)}
-              activeOpacity={0.7}
+              key={g}
+              testID={`grade-filter-${g}`}
+              style={[styles.gradeChip, gradeFilter === g && styles.gradeChipActive]}
+              onPress={() => toggleGrade(g)}
             >
-              <View style={[styles.subjectIcon, { backgroundColor: subject.color + '18' }]}>
-                <Ionicons
-                  name={(SUBJECT_ICONS[subject.icon] || 'book-outline') as any}
-                  size={28}
-                  color={subject.color}
-                />
-              </View>
-              <View style={styles.subjectInfo}>
-                <Text style={styles.subjectName}>{subject.name}</Text>
-                <Text style={styles.subjectDesc} numberOfLines={1}>{subject.description}</Text>
-                <Text style={styles.cardCount}>{subject.card_count} cartes</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+              <Text style={[styles.gradeText, gradeFilter === g && styles.gradeTextActive]}>
+                {GRADE_LABELS[g] || g}
+              </Text>
             </TouchableOpacity>
           ))}
+        </ScrollView>
+
+        {/* Import Button */}
+        <TouchableOpacity testID="import-deck-btn" style={styles.importBtn} onPress={handleImport}>
+          <Ionicons name="download-outline" size={18} color="#FF6B35" />
+          <Text style={styles.importBtnText}>Importer un deck (presse-papier)</Text>
+        </TouchableOpacity>
+
+        {/* Subjects */}
+        <Text style={[styles.sectionTitle, { marginTop: 16 }]}>
+          {gradeFilter ? `Matières (${GRADE_LABELS[gradeFilter]})` : 'Toutes les matières'}
+        </Text>
+        <View style={styles.subjectsGrid}>
+          {subjects.map((subject) => (
+            <View key={subject.id} style={[styles.subjectCard, { borderLeftColor: subject.color, borderLeftWidth: 4 }]}>
+              <TouchableOpacity
+                testID={`subject-card-${subject.id}`}
+                style={styles.subjectTouch}
+                onPress={() => router.push(`/study/${subject.id}`)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.subjectIcon, { backgroundColor: subject.color + '18' }]}>
+                  <Ionicons name={(SUBJECT_ICONS[subject.icon] || 'book-outline') as any} size={28} color={subject.color} />
+                </View>
+                <View style={styles.subjectInfo}>
+                  <Text style={styles.subjectName}>{subject.name}</Text>
+                  <Text style={styles.subjectDesc} numberOfLines={1}>{subject.description}</Text>
+                  <Text style={styles.cardCount}>{subject.card_count} cartes</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID={`export-btn-${subject.id}`}
+                style={styles.exportSmallBtn}
+                onPress={() => handleExport(subject.id, subject.name)}
+              >
+                <Ionicons name="share-outline" size={16} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+          ))}
+          {subjects.length === 0 && (
+            <Text style={styles.emptyText}>Aucune matière pour ce niveau</Text>
+          )}
         </View>
       </ScrollView>
 
-      {/* FAB - Create Card */}
-      <TouchableOpacity
-        testID="create-card-fab"
-        style={styles.fab}
-        onPress={() => router.push('/create-card')}
-        activeOpacity={0.8}
-      >
+      <TouchableOpacity testID="create-card-fab" style={styles.fab} onPress={() => router.push('/create-card')} activeOpacity={0.8}>
         <Ionicons name="add" size={28} color="#fff" />
       </TouchableOpacity>
     </SafeAreaView>
@@ -154,7 +222,7 @@ const styles = StyleSheet.create({
   },
   statText: { fontSize: 14, fontWeight: '700', color: '#1F2937' },
   levelCard: {
-    backgroundColor: '#fff', borderRadius: 20, padding: 16, marginBottom: 24,
+    backgroundColor: '#fff', borderRadius: 20, padding: 16, marginBottom: 20,
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 3,
   },
   levelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
@@ -162,18 +230,37 @@ const styles = StyleSheet.create({
   levelXP: { fontSize: 14, color: '#6B7280', fontWeight: '600' },
   progressBg: { height: 10, backgroundColor: '#E5E7EB', borderRadius: 5 },
   progressFill: { height: 10, backgroundColor: '#FF6B35', borderRadius: 5 },
-  sectionTitle: { fontSize: 22, fontWeight: '800', color: '#1F2937', marginBottom: 16 },
+  sectionTitle: { fontSize: 20, fontWeight: '800', color: '#1F2937', marginBottom: 12 },
+  gradeScroll: { marginBottom: 12 },
+  gradeChip: {
+    paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20,
+    borderWidth: 2, borderColor: '#E5E7EB', backgroundColor: '#fff', marginRight: 8,
+  },
+  gradeChipActive: { backgroundColor: '#FF6B35', borderColor: '#FF6B35' },
+  gradeText: { fontSize: 14, fontWeight: '600', color: '#1F2937' },
+  gradeTextActive: { color: '#fff' },
+  importBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingVertical: 10, paddingHorizontal: 16, backgroundColor: '#FFF3ED',
+    borderRadius: 12, alignSelf: 'flex-start',
+  },
+  importBtnText: { fontSize: 13, fontWeight: '600', color: '#FF6B35' },
   subjectsGrid: { gap: 12 },
   subjectCard: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 16,
-    padding: 16, gap: 14,
+    backgroundColor: '#fff', borderRadius: 16,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
   },
+  subjectTouch: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 14 },
   subjectIcon: { width: 52, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   subjectInfo: { flex: 1 },
   subjectName: { fontSize: 17, fontWeight: '700', color: '#1F2937' },
   subjectDesc: { fontSize: 13, color: '#6B7280', marginTop: 2 },
   cardCount: { fontSize: 12, color: '#FF6B35', fontWeight: '600', marginTop: 4 },
+  exportSmallBtn: {
+    position: 'absolute', top: 12, right: 12, width: 32, height: 32, borderRadius: 16,
+    backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center',
+  },
+  emptyText: { fontSize: 15, color: '#9CA3AF', textAlign: 'center', paddingVertical: 32 },
   fab: {
     position: 'absolute', bottom: 24, right: 24,
     width: 60, height: 60, borderRadius: 30, backgroundColor: '#FF6B35',

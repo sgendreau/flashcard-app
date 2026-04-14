@@ -16,10 +16,7 @@ export default function TabsLayout() {
           paddingTop: 8,
           height: 64,
         },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
-        },
+        tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
       }}
     >
       <Tabs.Screen
@@ -27,6 +24,13 @@ export default function TabsLayout() {
         options={{
           title: 'Accueil',
           tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="classes"
+        options={{
+          title: 'Classe',
+          tabBarIcon: ({ color, size }) => <Ionicons name="people" size={size} color={color} />,
         }}
       />
       <Tabs.Screen

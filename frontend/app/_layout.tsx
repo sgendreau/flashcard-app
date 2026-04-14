@@ -11,6 +11,7 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="study" />
+        <Stack.Screen name="class" />
         <Stack.Screen name="create-card" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
       </Stack>
     </AuthProvider>
