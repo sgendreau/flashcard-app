@@ -17,6 +17,7 @@ interface StudyCard { card_id: string; question: string; answer: string; show_si
 export default function StudySession() {
   const { subjectId, mode } = useLocalSearchParams<{ subjectId: string; mode?: string }>();
   const isQuiz = mode === 'quiz';
+  const isExam = mode === 'exam';
   const { colors } = useTheme();
   const router = useRouter();
 
@@ -53,7 +54,8 @@ export default function StudySession() {
 
   const loadCards = async () => {
     try {
-      const data = await api.get(`/study/start/${subjectId}`);
+      const endpoint = isExam ? `/study/exam/${subjectId}` : `/study/start/${subjectId}`;
+      const data = await api.get(endpoint);
       setCards(data.session_cards || []);
     } catch (e: any) { setError(e.message || 'Erreur'); }
     finally { setLoading(false); }
@@ -144,6 +146,7 @@ export default function StudySession() {
         <View style={{ alignItems: 'center' }}>
           <Text style={[s.progress, { color: colors.text }]}>{currentIndex + 1} / {cards.length}</Text>
           {isQuiz && <Text style={[s.modeBadge, { color: colors.warning }]}>QUIZ</Text>}
+          {isExam && <Text style={[s.modeBadge, { color: colors.error }]}>EXAMEN</Text>}
         </View>
         <View style={[s.boxBadge, { backgroundColor: boxColors[card.box - 1] + '20' }]}>
           <Text style={[s.boxText, { color: boxColors[card.box - 1] }]}>Boîte {card.box}</Text>

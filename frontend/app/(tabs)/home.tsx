@@ -68,7 +68,21 @@ export default function HomeScreen() {
     try { const r = await api.get('/rewards/daily'); setReward(r); } catch {}
   };
 
-  useFocusEffect(useCallback(() => { fetchReward(); }, []));
+  useFocusEffect(useCallback(() => { fetchReward(); fetchChallenges(); }, []));
+
+  // Challenges state
+  const [challenges, setChallenges] = useState<any[]>([]);
+  const fetchChallenges = async () => {
+    try { const d = await api.get('/challenges'); setChallenges(d.challenges || []); } catch {}
+  };
+  const claimChallenge = async (id: string) => {
+    try {
+      const data = await api.post(`/challenges/${id}/claim`);
+      Alert.alert('Défi complété !', `+${data.xp_earned} XP gagnés !`);
+      fetchChallenges();
+      await refreshUser();
+    } catch (e: any) { Alert.alert('Info', e.message); }
+  };
 
   const claimReward = async () => {
     setClaimingReward(true);
@@ -191,6 +205,35 @@ export default function HomeScreen() {
           <Text style={[styles.importBtnText, { color: colors.primary }]}>Importer un deck</Text>
         </TouchableOpacity>
 
+        {/* Challenges */}
+        {challenges.length > 0 && (
+          <>
+            <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 16 }]}>Défis de la semaine</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+              {challenges.map((ch: any) => (
+                <View key={ch.id} testID={`challenge-${ch.id}`}
+                  style={[styles.challengeCard, { backgroundColor: colors.surface, borderColor: ch.completed ? colors.success : colors.border }]}>
+                  <Ionicons name={ch.icon as any} size={24} color={ch.completed ? colors.success : colors.primary} />
+                  <Text style={[styles.challengeTitle, { color: colors.text }]}>{ch.title}</Text>
+                  <Text style={[styles.challengeDesc, { color: colors.textSecondary }]}>{ch.description}</Text>
+                  <View style={[styles.challengeBar, { backgroundColor: colors.border }]}>
+                    <View style={[styles.challengeBarFill, { width: `${(ch.progress / ch.target) * 100}%`, backgroundColor: ch.completed ? colors.success : colors.primary }]} />
+                  </View>
+                  <Text style={[styles.challengeProgress, { color: colors.textSecondary }]}>{ch.progress}/{ch.target}</Text>
+                  {ch.completed && !ch.claimed && (
+                    <TouchableOpacity testID={`claim-challenge-${ch.id}`}
+                      style={[styles.challengeClaimBtn, { backgroundColor: colors.success }]}
+                      onPress={() => claimChallenge(ch.id)}>
+                      <Text style={styles.challengeClaimText}>+{ch.xp_reward} XP</Text>
+                    </TouchableOpacity>
+                  )}
+                  {ch.claimed && <Ionicons name="checkmark-circle" size={18} color={colors.success} />}
+                </View>
+              ))}
+            </ScrollView>
+          </>
+        )}
+
         {/* Subjects */}
         <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 16 }]}>
           {gradeFilter ? `Matières (${GRADE_LABELS[gradeFilter]})` : 'Toutes les matières'}
@@ -216,6 +259,12 @@ export default function HomeScreen() {
                 onPress={() => router.push(`/study/${subject.id}?mode=quiz`)}>
                 <Ionicons name="timer-outline" size={14} color={colors.warning} />
                 <Text style={[styles.quizBtnText, { color: colors.warning }]}>Quiz</Text>
+              </TouchableOpacity>
+              <TouchableOpacity testID={`exam-btn-${subject.id}`}
+                style={[styles.examBtn, { backgroundColor: colors.errorBg }]}
+                onPress={() => router.push(`/study/${subject.id}?mode=exam`)}>
+                <Ionicons name="school-outline" size={14} color={colors.error} />
+                <Text style={[styles.quizBtnText, { color: colors.error }]}>Examen</Text>
               </TouchableOpacity>
               <TouchableOpacity testID={`export-btn-${subject.id}`} style={[styles.exportSmallBtn, { backgroundColor: colors.surfaceAlt }]}
                 onPress={() => handleExport(subject.id, subject.name)}>
@@ -266,9 +315,21 @@ const styles = StyleSheet.create({
   subjectDesc: { fontSize: 13, marginTop: 2 },
   cardCount: { fontSize: 12, fontWeight: '600', marginTop: 4 },
   quizBtn: { position: 'absolute', bottom: 12, right: 50, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
+  examBtn: { position: 'absolute', bottom: 12, right: 108, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
   quizBtnText: { fontSize: 11, fontWeight: '700' },
   exportSmallBtn: { position: 'absolute', top: 12, right: 12, width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   emptyText: { fontSize: 15, textAlign: 'center', paddingVertical: 32 },
+  challengeCard: {
+    width: 160, borderRadius: 16, padding: 14, marginRight: 12, borderWidth: 2,
+    alignItems: 'center', gap: 6,
+  },
+  challengeTitle: { fontSize: 14, fontWeight: '700', textAlign: 'center' },
+  challengeDesc: { fontSize: 10, textAlign: 'center' },
+  challengeBar: { width: '100%', height: 6, borderRadius: 3, marginTop: 4 },
+  challengeBarFill: { height: 6, borderRadius: 3 },
+  challengeProgress: { fontSize: 11, fontWeight: '600' },
+  challengeClaimBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, marginTop: 4 },
+  challengeClaimText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   rewardCard: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 2,

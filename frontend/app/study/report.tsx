@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Share, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { api } from '../../src/utils/api';
 
 export default function ReportScreen() {
   const router = useRouter();
@@ -121,6 +122,24 @@ export default function ReportScreen() {
           </View>
         )}
 
+        {/* Share Button */}
+        <TouchableOpacity
+          testID="report-share-btn"
+          style={styles.shareBtn}
+          onPress={async () => {
+            try {
+              const data = await api.post('/share/session', {
+                percentage, correct, total, xp_earned: xpEarned,
+              });
+              await Share.share({ message: data.share_text });
+            } catch { Alert.alert('Erreur', 'Partage indisponible'); }
+          }}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="share-social" size={20} color="#3B82F6" />
+          <Text style={styles.shareBtnText}>Partager mon résultat</Text>
+        </TouchableOpacity>
+
         {/* Back Button */}
         <TouchableOpacity
           testID="report-home-btn"
@@ -174,4 +193,9 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 8,
   },
   homeBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  shareBtn: {
+    flexDirection: 'row', backgroundColor: '#EEF2FF', borderRadius: 16, paddingVertical: 16,
+    alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 16, borderWidth: 2, borderColor: '#BFDBFE',
+  },
+  shareBtnText: { color: '#3B82F6', fontSize: 16, fontWeight: '700' },
 });

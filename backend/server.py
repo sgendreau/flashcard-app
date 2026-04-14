@@ -132,6 +132,17 @@ class UpdateThemeInput(BaseModel):
 
 DAILY_REWARD_XP = [25, 50, 75, 100, 150, 200, 300]  # Day 1-7 cycle
 
+WEEKLY_CHALLENGES = [
+    {"id": "sessions_5", "type": "sessions", "title": "Marathonien", "description": "Complète 5 sessions cette semaine", "target": 5, "xp_reward": 200, "icon": "albums-outline"},
+    {"id": "perfect_2", "type": "perfect", "title": "Sans faute", "description": "Obtiens 100% sur 2 sessions", "target": 2, "xp_reward": 300, "icon": "star-outline"},
+    {"id": "subjects_3", "type": "subjects", "title": "Touche-à-tout", "description": "Étudie 3 matières différentes", "target": 3, "xp_reward": 150, "icon": "grid-outline"},
+    {"id": "master_5", "type": "master", "title": "Maître absolu", "description": "Déplace 5 cartes en boîte 3", "target": 5, "xp_reward": 250, "icon": "trophy-outline"},
+]
+
+def get_week_start():
+    today = datetime.now(timezone.utc).date()
+    return today - timedelta(days=today.weekday())
+
 # ─── APP SETUP ───
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -747,6 +758,183 @@ async def import_deck(input: ImportDeckInput, request: Request):
     return {"imported": imported, "subject_id": input.subject_id}
 
 # ═══════════════════════════════════════════
+# EXAM REVISION MODE
+# ═══════════════════════════════════════════
+@api_router.get("/study/exam/{subject_id}")
+async def start_exam_revision(subject_id: str, request: Request):
+    user = await get_current_user(request)
+    user_id = user["_id"]
+
+    # Exam mode: show ALL cards regardless of grade (intensive revision)
+    all_cards = await db.flashcards.find({"subject_id": subject_id}, {"_id": 0}).to_list(500)
+    if not all_cards:
+        raise HTTPException(status_code=404, detail="Aucune flashcard")
+
+    card_ids = [c["id"] for c in all_cards]
+    progress_list = await db.user_card_progress.find(
+        {"user_id": user_id, "card_id": {"$in": card_ids}}, {"_id": 0}
+    ).to_list(500)
+    progress_map = {p["card_id"]: p for p in progress_list}
+
+    # Sort: box 1 first (weakest), then box 2, then box 3, then new cards
+    def sort_key(card):
+        prog = progress_map.get(card["id"])
+        if not prog:
+            return (0, 0)  # New cards = highest priority
+        return (prog["box"], prog.get("times_correct", 0))
+
+    all_cards.sort(key=sort_key)
+
+    session_cards = []
+    for card in all_cards[:30]:  # Up to 30 cards for exam mode
+        prog = progress_map.get(card["id"])
+        show_side = "answer" if not prog else ("question" if prog.get("last_shown_side") == "answer" else "answer")
+        session_cards.append({
+            "card_id": card["id"], "question": card["question"],
+            "answer": card["answer"], "show_side": show_side,
+            "box": prog["box"] if prog else 1,
+        })
+
+    total_cards = await db.flashcards.count_documents({"subject_id": subject_id})
+    mastered = await db.user_card_progress.count_documents({"user_id": user_id, "subject_id": subject_id, "box": 3})
+
+    return {
+        "session_cards": session_cards, "total": len(session_cards),
+        "total_subject_cards": total_cards, "mastered_cards": mastered,
+        "mastery_pct": round((mastered / total_cards) * 100) if total_cards else 0,
+    }
+
+# ═══════════════════════════════════════════
+# WEEKLY CHALLENGES
+# ═══════════════════════════════════════════
+@api_router.get("/challenges")
+async def get_challenges(request: Request):
+    user = await get_current_user(request)
+    user_id = user["_id"]
+    week_start = get_week_start()
+    week_start_dt = datetime(week_start.year, week_start.month, week_start.day, tzinfo=timezone.utc)
+
+    # Get sessions this week
+    week_sessions = await db.study_sessions.find(
+        {"user_id": user_id, "completed_at": {"$gte": week_start_dt}}, {"_id": 0}
+    ).to_list(500)
+
+    # Calculate progress for each challenge
+    challenges = []
+    for ch in WEEKLY_CHALLENGES:
+        progress = 0
+        if ch["type"] == "sessions":
+            progress = len(week_sessions)
+        elif ch["type"] == "perfect":
+            progress = sum(1 for s in week_sessions if s.get("percentage") == 100)
+        elif ch["type"] == "subjects":
+            progress = len(set(s.get("subject_id") for s in week_sessions))
+        elif ch["type"] == "master":
+            progress = await db.user_card_progress.count_documents({
+                "user_id": user_id, "box": 3,
+                "last_reviewed": {"$gte": week_start_dt}
+            })
+
+        completed = progress >= ch["target"]
+        # Check if already claimed
+        claimed = await db.challenge_claims.find_one({
+            "user_id": user_id, "challenge_id": ch["id"],
+            "week_start": week_start.isoformat(),
+        })
+
+        challenges.append({
+            **ch, "progress": min(progress, ch["target"]),
+            "completed": completed, "claimed": bool(claimed),
+        })
+
+    return {"challenges": challenges, "week_start": week_start.isoformat()}
+
+@api_router.post("/challenges/{challenge_id}/claim")
+async def claim_challenge(challenge_id: str, request: Request):
+    user = await get_current_user(request)
+    user_id = user["_id"]
+    week_start = get_week_start()
+
+    ch = next((c for c in WEEKLY_CHALLENGES if c["id"] == challenge_id), None)
+    if not ch:
+        raise HTTPException(status_code=404, detail="Défi introuvable")
+
+    claimed = await db.challenge_claims.find_one({
+        "user_id": user_id, "challenge_id": challenge_id,
+        "week_start": week_start.isoformat(),
+    })
+    if claimed:
+        raise HTTPException(status_code=400, detail="Déjà réclamé")
+
+    # Verify completion
+    week_start_dt = datetime(week_start.year, week_start.month, week_start.day, tzinfo=timezone.utc)
+    week_sessions = await db.study_sessions.find(
+        {"user_id": user_id, "completed_at": {"$gte": week_start_dt}}, {"_id": 0}
+    ).to_list(500)
+
+    progress = 0
+    if ch["type"] == "sessions":
+        progress = len(week_sessions)
+    elif ch["type"] == "perfect":
+        progress = sum(1 for s in week_sessions if s.get("percentage") == 100)
+    elif ch["type"] == "subjects":
+        progress = len(set(s.get("subject_id") for s in week_sessions))
+    elif ch["type"] == "master":
+        progress = await db.user_card_progress.count_documents({
+            "user_id": user_id, "box": 3, "last_reviewed": {"$gte": week_start_dt}
+        })
+
+    if progress < ch["target"]:
+        raise HTTPException(status_code=400, detail="Défi pas encore complété")
+
+    xp = ch["xp_reward"]
+    user_doc = await db.users.find_one({"_id": ObjectId(user_id)})
+    new_xp = user_doc.get("xp", 0) + xp
+    new_level = (new_xp // 500) + 1
+    await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": {"xp": new_xp, "level": new_level}})
+    await db.challenge_claims.insert_one({
+        "user_id": user_id, "challenge_id": challenge_id,
+        "week_start": week_start.isoformat(), "claimed_at": datetime.now(timezone.utc),
+    })
+    return {"xp_earned": xp, "total_xp": new_xp, "new_level": new_level}
+
+# ═══════════════════════════════════════════
+# SOCIAL SHARING
+# ═══════════════════════════════════════════
+@api_router.get("/share/profile")
+async def get_share_profile(request: Request):
+    user = await get_current_user(request)
+    user_doc = await db.users.find_one({"_id": ObjectId(user["_id"])})
+    session_count = await db.study_sessions.count_documents({"user_id": user["_id"]})
+    box3 = await db.user_card_progress.count_documents({"user_id": user["_id"], "box": 3})
+    text = (
+        f"📚 FlashCards — Mon profil\n"
+        f"👤 {user_doc['name']}\n"
+        f"⭐ {user_doc.get('xp', 0)} XP • Niveau {user_doc.get('level', 1)}\n"
+        f"🔥 {user_doc.get('streak_count', 0)} jours de streak\n"
+        f"📖 {session_count} sessions complétées\n"
+        f"🏆 {len(user_doc.get('badges', []))} badges • {box3} cartes maîtrisées\n"
+        f"#FlashCards #Révisions #Éducation"
+    )
+    return {"share_text": text}
+
+@api_router.post("/share/session")
+async def get_share_session(request: Request):
+    body = await request.json()
+    pct = body.get("percentage", 0)
+    correct = body.get("correct", 0)
+    total = body.get("total", 0)
+    xp = body.get("xp_earned", 0)
+    emoji = "🏆" if pct == 100 else ("🎉" if pct >= 80 else ("👍" if pct >= 50 else "💪"))
+    text = (
+        f"{emoji} FlashCards — Résultat\n"
+        f"📊 Score : {pct}% ({correct}/{total})\n"
+        f"⭐ +{xp} XP gagnés\n"
+        f"#FlashCards #Révisions"
+    )
+    return {"share_text": text}
+
+# ═══════════════════════════════════════════
 # SEED DATA
 # ═══════════════════════════════════════════
 SUBJECTS_SEED = [
@@ -851,6 +1039,7 @@ async def seed_data():
     await db.classes.create_index("code", unique=True)
     await db.classes.create_index("members.user_id")
     await db.shared_decks.create_index("class_id")
+    await db.challenge_claims.create_index([("user_id", 1), ("challenge_id", 1), ("week_start", 1)], unique=True)
     logger.info("Seed data loaded successfully")
 
 @app.on_event("startup")

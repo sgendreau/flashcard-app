@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl,
-  ActivityIndicator, Alert, Switch,
+  ActivityIndicator, Alert, Switch, Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -176,6 +176,13 @@ export default function ProfileScreen() {
           )}
         </View>
 
+        <TouchableOpacity testID="share-profile-btn" style={st.shareBtn} onPress={async () => {
+          try { const d = await api.get('/share/profile'); await Share.share({ message: d.share_text }); } catch {}
+        }}>
+          <Ionicons name="share-social-outline" size={20} color="#3B82F6" />
+          <Text style={st.shareBtnText}>Partager mon profil</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity testID="logout-btn" style={st.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
           <Ionicons name="log-out-outline" size={20} color={colors.error} />
           <Text style={[st.logoutText, { color: colors.error }]}>Se déconnecter</Text>
@@ -215,4 +222,6 @@ const st = StyleSheet.create({
   emptyText: { fontSize: 14, textAlign: 'center', paddingVertical: 16 },
   logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16, marginTop: 8 },
   logoutText: { fontSize: 16, fontWeight: '600' },
+  shareBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, marginTop: 8, backgroundColor: '#EEF2FF', borderRadius: 16, borderWidth: 2, borderColor: '#BFDBFE' },
+  shareBtnText: { fontSize: 15, fontWeight: '700', color: '#3B82F6' },
 });
