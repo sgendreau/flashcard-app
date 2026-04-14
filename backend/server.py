@@ -935,6 +935,94 @@ async def get_share_session(request: Request):
     return {"share_text": text}
 
 # ═══════════════════════════════════════════
+# AI FLASHCARD GENERATION (Claude Sonnet)
+# ═══════════════════════════════════════════
+class AIGenerateInput(BaseModel):
+    subject_id: str
+    text: str
+    count: int = 5
+
+@api_router.post("/ai/generate")
+async def ai_generate_flashcards(input: AIGenerateInput, request: Request):
+    user = await get_current_user(request)
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    import json as json_mod
+    import uuid
+
+    subject = await db.subjects.find_one({"id": input.subject_id}, {"_id": 0})
+    subject_name = subject["name"] if subject else input.subject_id
+
+    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="Clé IA non configurée")
+
+    chat = LlmChat(
+        api_key=api_key,
+        session_id=f"flashcard-gen-{uuid.uuid4().hex[:8]}",
+        system_message=(
+            "Tu es un assistant pédagogique expert pour les élèves français de la 6ème à la Terminale. "
+            "Tu génères des flashcards éducatives au format JSON. "
+            "Chaque flashcard a un 'question' (terme/concept) et une 'answer' (définition concise). "
+            "Réponds UNIQUEMENT avec un tableau JSON valide, sans texte autour."
+        )
+    ).with_model("anthropic", "claude-sonnet-4-5-20250929")
+
+    prompt = (
+        f"Matière: {subject_name}\n\n"
+        f"À partir du texte suivant, génère exactement {input.count} flashcards éducatives.\n"
+        f"Format: un tableau JSON [{{'question': '...', 'answer': '...'}}]\n\n"
+        f"Texte:\n{input.text[:3000]}"
+    )
+
+    try:
+        response = await chat.send_message(UserMessage(text=prompt))
+        response_text = response.strip()
+        if response_text.startswith("```"):
+            response_text = response_text.split("```")[1]
+            if response_text.startswith("json"):
+                response_text = response_text[4:]
+        cards_data = json_mod.loads(response_text)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur IA: {str(e)}")
+
+    saved = []
+    user_grade = user.get("grade_level")
+    gl = [user_grade] if user_grade else list(GRADE_LEVELS)
+    for card_data in cards_data[:input.count]:
+        q = card_data.get("question", "").strip()
+        a = card_data.get("answer", "").strip()
+        if not q or not a:
+            continue
+        card_id = str(ObjectId())
+        await db.flashcards.insert_one({
+            "id": card_id, "subject_id": input.subject_id,
+            "question": q, "answer": a, "grade_levels": gl,
+            "created_by": user["_id"], "created_at": datetime.now(timezone.utc),
+        })
+        saved.append({"id": card_id, "question": q, "answer": a})
+    return {"generated": len(saved), "cards": saved}
+
+# ═══════════════════════════════════════════
+# SYNC STATUS
+# ═══════════════════════════════════════════
+@api_router.get("/sync/status")
+async def get_sync_status(request: Request):
+    user = await get_current_user(request)
+    user_id = user["_id"]
+    card_count = await db.user_card_progress.count_documents({"user_id": user_id})
+    session_count = await db.study_sessions.count_documents({"user_id": user_id})
+    last_session = await db.study_sessions.find_one(
+        {"user_id": user_id}, {"_id": 0, "completed_at": 1},
+        sort=[("completed_at", -1)]
+    )
+    last_sync = last_session["completed_at"].isoformat() if last_session and isinstance(last_session.get("completed_at"), datetime) else None
+    return {
+        "synced": True, "card_progress_count": card_count,
+        "session_count": session_count, "last_activity": last_sync,
+        "server_time": datetime.now(timezone.utc).isoformat(),
+    }
+
+# ═══════════════════════════════════════════
 # SEED DATA
 # ═══════════════════════════════════════════
 SUBJECTS_SEED = [

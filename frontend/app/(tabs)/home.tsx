@@ -8,6 +8,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { useTheme } from '../../src/context/ThemeContext';
+import { useResponsive } from '../../src/utils/responsive';
 import { api } from '../../src/utils/api';
 import * as Clipboard from 'expo-clipboard';
 
@@ -29,6 +30,7 @@ interface Subject { id: string; name: string; icon: string; color: string; descr
 export default function HomeScreen() {
   const { user, refreshUser } = useAuth();
   const { colors } = useTheme();
+  const { isTablet, columns } = useResponsive();
   const router = useRouter();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [gradeFilter, setGradeFilter] = useState<string | null>(null);
@@ -238,9 +240,9 @@ export default function HomeScreen() {
         <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 16 }]}>
           {gradeFilter ? `Matières (${GRADE_LABELS[gradeFilter]})` : 'Toutes les matières'}
         </Text>
-        <View style={styles.subjectsGrid}>
+        <View style={[styles.subjectsGrid, isTablet && { flexDirection: 'row', flexWrap: 'wrap' }]}>
           {subjects.map((subject) => (
-            <View key={subject.id} style={[styles.subjectCard, { backgroundColor: colors.surface, borderLeftColor: subject.color }]}>
+            <View key={subject.id} style={[styles.subjectCard, { backgroundColor: colors.surface, borderLeftColor: subject.color }, isTablet && { width: '48%' }]}>
               <TouchableOpacity testID={`subject-card-${subject.id}`} style={styles.subjectTouch}
                 onPress={() => router.push(`/study/${subject.id}`)} activeOpacity={0.7}>
                 <View style={[styles.subjectIcon, { backgroundColor: subject.color + '18' }]}>
@@ -275,6 +277,10 @@ export default function HomeScreen() {
           {subjects.length === 0 && <Text style={[styles.emptyText, { color: colors.textMuted }]}>Aucune matière pour ce niveau</Text>}
         </View>
       </ScrollView>
+
+      <TouchableOpacity testID="ai-generate-fab" style={[styles.aiFab, { backgroundColor: '#8B5CF6' }]} onPress={() => router.push('/ai-generate')} activeOpacity={0.8}>
+        <Ionicons name="sparkles" size={24} color="#fff" />
+      </TouchableOpacity>
 
       <TouchableOpacity testID="create-card-fab" style={[styles.fab, { backgroundColor: colors.primary }]} onPress={() => router.push('/create-card')} activeOpacity={0.8}>
         <Ionicons name="add" size={28} color="#fff" />
@@ -342,6 +348,11 @@ const styles = StyleSheet.create({
   rewardBtnText: { fontSize: 13, fontWeight: '700' },
   rewardClaimedCard: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, padding: 12, marginBottom: 16 },
   rewardClaimedText: { fontSize: 14, fontWeight: '600' },
+  aiFab: {
+    position: 'absolute', bottom: 92, right: 24, width: 52, height: 52, borderRadius: 26,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 5,
+  },
   fab: {
     position: 'absolute', bottom: 24, right: 24, width: 60, height: 60, borderRadius: 30,
     alignItems: 'center', justifyContent: 'center',

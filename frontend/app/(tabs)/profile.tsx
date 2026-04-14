@@ -25,12 +25,17 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [notifEnabled, setNotifEnabled] = useState(user?.notification_enabled ?? true);
+  const [syncStatus, setSyncStatus] = useState<any>(null);
 
   const fetchStats = async () => {
     try {
       await refreshUser();
-      const data = await api.get('/progress/stats');
-      setStats(data);
+      const [statsData, syncData] = await Promise.all([
+        api.get('/progress/stats'),
+        api.get('/sync/status'),
+      ]);
+      setStats(statsData);
+      setSyncStatus(syncData);
     } catch (e) { console.log('Error:', e); }
     finally { setLoading(false); setRefreshing(false); }
   };
@@ -175,6 +180,26 @@ export default function ProfileScreen() {
             </View>
           )}
         </View>
+
+        {/* Sync Status */}
+        {syncStatus && (
+          <View style={[st.card, { backgroundColor: colors.surface }]}>
+            <View style={st.settingRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[st.cardTitle, { color: colors.text }]}>Synchronisation</Text>
+                <Text style={[st.settingDesc, { color: colors.textSecondary }]}>
+                  {syncStatus.session_count} sessions • {syncStatus.card_progress_count} cartes suivies
+                </Text>
+                {syncStatus.last_activity && (
+                  <Text style={[st.settingDesc, { color: colors.textMuted, marginTop: 4 }]}>
+                    Dernière activité: {new Date(syncStatus.last_activity).toLocaleDateString('fr-FR')}
+                  </Text>
+                )}
+              </View>
+              <Ionicons name="cloud-done-outline" size={24} color={colors.success} />
+            </View>
+          </View>
+        )}
 
         <TouchableOpacity testID="share-profile-btn" style={st.shareBtn} onPress={async () => {
           try { const d = await api.get('/share/profile'); await Share.share({ message: d.share_text }); } catch {}
