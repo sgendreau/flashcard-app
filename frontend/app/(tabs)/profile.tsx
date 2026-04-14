@@ -3,7 +3,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { api } from '../../src/utils/api';
@@ -19,6 +19,7 @@ const BADGE_COLORS: Record<string, string> = {
 
 export default function ProfileScreen() {
   const { user, logout, refreshUser } = useAuth();
+  const router = useRouter();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -40,7 +41,10 @@ export default function ProfileScreen() {
 
   const onRefresh = () => { setRefreshing(true); fetchStats(); };
 
-  const handleLogout = async () => { await logout(); };
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/(auth)/login');
+  };
 
   if (loading) {
     return (

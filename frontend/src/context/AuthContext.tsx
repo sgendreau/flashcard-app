@@ -82,6 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     await AsyncStorage.multiRemove(['access_token', 'refresh_token']);
     setUser(null);
+    // Navigation handled by the component calling logout
   };
 
   const refreshUser = async () => {
