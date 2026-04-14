@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
   gradeText: { fontSize: 14, fontWeight: '600' },
   importBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12, alignSelf: 'flex-start' },
   importBtnText: { fontSize: 13, fontWeight: '600' },
-  subjectsGrid: { gap: 12 },
+  subjectsGrid: { gap: 12, flexWrap: 'wrap' },
   subjectCard: { borderRadius: 16, borderLeftWidth: 4 },
   subjectTouch: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 14 },
   subjectIcon: { width: 52, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },

@@ -9,7 +9,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { useTheme } from '../../src/context/ThemeContext';
 import { api } from '../../src/utils/api';
-import * as Notifications from 'expo-notifications';
+
+let Notifications: any = null;
+try { Notifications = require('expo-notifications'); } catch {}
 
 const GRADE_LABELS: Record<string, string> = {
   '6eme': '6ème', '5eme': '5ème', '4eme': '4ème', '3eme': '3ème',
@@ -58,17 +60,20 @@ export default function ProfileScreen() {
   const toggleNotifications = async (value: boolean) => {
     setNotifEnabled(value);
     try {
+      if (!Notifications) { await api.put('/user/notifications', { notification_enabled: value, notification_hour: 18 }); return; }
       if (value) {
         const { status } = await Notifications.requestPermissionsAsync();
         if (status !== 'granted') { Alert.alert('Permission refusée'); setNotifEnabled(false); return; }
         await Notifications.cancelAllScheduledNotificationsAsync();
         await Notifications.scheduleNotificationAsync({
           content: { title: "N'oublie pas de réviser !", body: 'Maintiens ton streak !' },
-          trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour: 18, minute: 0 },
+          trigger: { type: Notifications.SchedulableTriggerInputTypes?.DAILY || 'daily', hour: 18, minute: 0 },
         });
-      } else { await Notifications.cancelAllScheduledNotificationsAsync(); }
+      } else {
+        await Notifications.cancelAllScheduledNotificationsAsync();
+      }
       await api.put('/user/notifications', { notification_enabled: value, notification_hour: 18 });
-    } catch {}
+    } catch { /* Notification not supported in this env */ }
   };
 
   if (loading) return <SafeAreaView style={[st.safe, { backgroundColor: colors.bg }]}><View style={st.center}><ActivityIndicator size="large" color={colors.primary} /></View></SafeAreaView>;
