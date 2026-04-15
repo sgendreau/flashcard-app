@@ -11,6 +11,7 @@ import { useTheme } from '../../src/context/ThemeContext';
 import { useResponsive } from '../../src/utils/responsive';
 import { api } from '../../src/utils/api';
 import * as Clipboard from 'expo-clipboard';
+import { cacheSubjects, getCachedSubjects, cacheFlashcards } from '../../src/utils/offlineCache';
 
 const SUBJECT_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   'calculator-outline': 'calculator-outline', 'book-outline': 'book-outline',

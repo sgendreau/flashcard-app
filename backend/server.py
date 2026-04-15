@@ -45,6 +45,9 @@ def create_refresh_token(user_id: str) -> str:
 def generate_class_code():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
+def generate_referral_code():
+    return 'FC' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
+
 def user_response(user_doc, user_id=None):
     uid = user_id or str(user_doc.get("_id", ""))
     return {
@@ -55,6 +58,8 @@ def user_response(user_doc, user_id=None):
         "grade_level": user_doc.get("grade_level"),
         "notification_enabled": user_doc.get("notification_enabled", True),
         "notification_hour": user_doc.get("notification_hour", 18),
+        "theme": user_doc.get("theme", "light"),
+        "referral_code": user_doc.get("referral_code", ""),
     }
 
 async def get_current_user(request: Request) -> dict:
@@ -85,6 +90,7 @@ class RegisterInput(BaseModel):
     name: str
     email: str
     password: str
+    referral_code: Optional[str] = None
 
 class LoginInput(BaseModel):
     email: str
@@ -163,10 +169,27 @@ async def register(input: RegisterInput):
         "last_study_date": None, "badges": [],
         "grade_level": None, "notification_enabled": True, "notification_hour": 18,
         "reward_day": 0, "last_reward_date": None,
+        "referral_code": generate_referral_code(), "referred_by": None, "referral_count": 0,
         "created_at": datetime.now(timezone.utc),
     }
     result = await db.users.insert_one(user_doc)
     user_id = str(result.inserted_id)
+
+    # Handle referral
+    if input.referral_code:
+        referrer = await db.users.find_one({"referral_code": input.referral_code.upper().strip()})
+        if referrer:
+            ref_id = str(referrer["_id"])
+            await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": {"referred_by": ref_id, "xp": 100, "level": 1}})
+            await db.users.update_one(
+                {"_id": referrer["_id"]},
+                {"$inc": {"xp": 100, "referral_count": 1}}
+            )
+            ref_new_xp = referrer.get("xp", 0) + 100
+            ref_new_level = (ref_new_xp // 500) + 1
+            await db.users.update_one({"_id": referrer["_id"]}, {"$set": {"level": ref_new_level}})
+            user_doc["xp"] = 100
+
     return {
         "user": user_response(user_doc, user_id),
         "access_token": create_access_token(user_id, email),
@@ -1023,6 +1046,28 @@ async def get_sync_status(request: Request):
     }
 
 # ═══════════════════════════════════════════
+# REFERRAL SYSTEM
+# ═══════════════════════════════════════════
+@api_router.get("/referral/stats")
+async def get_referral_stats(request: Request):
+    user = await get_current_user(request)
+    user_doc = await db.users.find_one({"_id": ObjectId(user["_id"])})
+    referral_code = user_doc.get("referral_code", "")
+    referral_count = user_doc.get("referral_count", 0)
+    referred_users = await db.users.find(
+        {"referred_by": user["_id"]}, {"_id": 0, "name": 1, "xp": 1, "level": 1, "created_at": 1}
+    ).to_list(100)
+    for r in referred_users:
+        if isinstance(r.get("created_at"), datetime):
+            r["created_at"] = r["created_at"].isoformat()
+    return {
+        "referral_code": referral_code,
+        "referral_count": referral_count,
+        "xp_earned_from_referrals": referral_count * 100,
+        "referred_users": referred_users,
+    }
+
+# ═══════════════════════════════════════════
 # SEED DATA
 # ═══════════════════════════════════════════
 SUBJECTS_SEED = [
@@ -1128,6 +1173,7 @@ async def seed_data():
     await db.classes.create_index("members.user_id")
     await db.shared_decks.create_index("class_id")
     await db.challenge_claims.create_index([("user_id", 1), ("challenge_id", 1), ("week_start", 1)], unique=True)
+    await db.users.create_index("referral_code", unique=True, sparse=True)
     logger.info("Seed data loaded successfully")
 
 @app.on_event("startup")

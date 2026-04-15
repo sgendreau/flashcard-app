@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { useTheme } from '../../src/context/ThemeContext';
 import { api } from '../../src/utils/api';
+import { getOfflineStatus } from '../../src/utils/offlineCache';
 
 let Notifications: any = null;
 try { Notifications = require('expo-notifications'); } catch {}
@@ -28,16 +29,21 @@ export default function ProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [notifEnabled, setNotifEnabled] = useState(user?.notification_enabled ?? true);
   const [syncStatus, setSyncStatus] = useState<any>(null);
+  const [referralStats, setReferralStats] = useState<any>(null);
+  const [offlineInfo, setOfflineInfo] = useState<any>(null);
 
   const fetchStats = async () => {
     try {
       await refreshUser();
-      const [statsData, syncData] = await Promise.all([
+      const [statsData, syncData, refData] = await Promise.all([
         api.get('/progress/stats'),
         api.get('/sync/status'),
+        api.get('/referral/stats'),
       ]);
       setStats(statsData);
       setSyncStatus(syncData);
+      setReferralStats(refData);
+      try { const offData = await getOfflineStatus(); setOfflineInfo(offData); } catch {}
     } catch (e) { console.log('Error:', e); }
     finally { setLoading(false); setRefreshing(false); }
   };
@@ -186,6 +192,48 @@ export default function ProfileScreen() {
           )}
         </View>
 
+        {/* Referral */}
+        {referralStats && (
+          <View style={[st.card, { backgroundColor: colors.surface }]}>
+            <Text style={[st.cardTitle, { color: colors.text }]}>Parrainage</Text>
+            <View style={[st.referralCodeBox, { backgroundColor: colors.primaryBg, borderColor: colors.primary }]}>
+              <Text style={[st.referralLabel, { color: colors.textSecondary }]}>Ton code</Text>
+              <Text style={[st.referralCode, { color: colors.primary }]} testID="referral-code">{referralStats.referral_code}</Text>
+            </View>
+            <TouchableOpacity testID="share-referral-btn" style={[st.shareBtn, { marginTop: 12 }]}
+              onPress={async () => {
+                const msg = `Rejoins-moi sur FlashCards ! Utilise mon code ${referralStats.referral_code} à l'inscription et on gagne chacun 100 XP ! 📚✨`;
+                try { await Share.share({ message: msg }); } catch {}
+              }}>
+              <Ionicons name="gift-outline" size={18} color="#3B82F6" />
+              <Text style={st.shareBtnText}>Inviter un ami (+100 XP chacun)</Text>
+            </TouchableOpacity>
+            <Text style={[st.settingDesc, { color: colors.textSecondary, marginTop: 8 }]}>
+              {referralStats.referral_count} ami(s) parrainé(s) • +{referralStats.xp_earned_from_referrals} XP gagnés
+            </Text>
+          </View>
+        )}
+
+        {/* Offline Cache */}
+        {offlineInfo && (
+          <View style={[st.card, { backgroundColor: colors.surface }]}>
+            <View style={st.settingRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[st.cardTitle, { color: colors.text }]}>Mode hors-ligne</Text>
+                <Text style={[st.settingDesc, { color: colors.textSecondary }]}>
+                  {offlineInfo.hasCache ? `${offlineInfo.subjectCount} matières en cache` : 'Aucun cache local'}
+                </Text>
+                {offlineInfo.pendingCount > 0 && (
+                  <Text style={[st.settingDesc, { color: colors.warning, marginTop: 4 }]}>
+                    {offlineInfo.pendingCount} résultat(s) en attente de sync
+                  </Text>
+                )}
+              </View>
+              <Ionicons name={offlineInfo.hasCache ? 'phone-portrait-outline' : 'cloud-offline-outline'} size={24} color={offlineInfo.hasCache ? colors.success : colors.textMuted} />
+            </View>
+          </View>
+        )}
+
         {/* Sync Status */}
         {syncStatus && (
           <View style={[st.card, { backgroundColor: colors.surface }]}>
@@ -254,4 +302,7 @@ const st = StyleSheet.create({
   logoutText: { fontSize: 16, fontWeight: '600' },
   shareBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, marginTop: 8, backgroundColor: '#EEF2FF', borderRadius: 16, borderWidth: 2, borderColor: '#BFDBFE' },
   shareBtnText: { fontSize: 15, fontWeight: '700', color: '#3B82F6' },
+  referralCodeBox: { borderRadius: 14, padding: 14, borderWidth: 2, borderStyle: 'dashed', alignItems: 'center' },
+  referralLabel: { fontSize: 11, fontWeight: '600' },
+  referralCode: { fontSize: 28, fontWeight: '900', letterSpacing: 3, marginTop: 4 },
 });

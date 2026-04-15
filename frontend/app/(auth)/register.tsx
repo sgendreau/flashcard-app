@@ -12,6 +12,7 @@ export default function RegisterScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
@@ -31,7 +32,7 @@ export default function RegisterScreen() {
     setError('');
     setLoading(true);
     try {
-      await register(name.trim(), email.trim(), password);
+      await register(name.trim(), email.trim(), password, referralCode.trim() || undefined);
       router.replace('/(tabs)/home');
     } catch (e: any) {
       setError(e.message || "Erreur d'inscription");
@@ -107,6 +108,19 @@ export default function RegisterScreen() {
               <TouchableOpacity testID="register-toggle-pass" onPress={() => setShowPass(!showPass)}>
                 <Ionicons name={showPass ? 'eye-off-outline' : 'eye-outline'} size={20} color="#6B7280" />
               </TouchableOpacity>
+            </View>
+
+            <View style={styles.inputWrap}>
+              <Ionicons name="gift-outline" size={20} color="#6B7280" style={styles.inputIcon} />
+              <TextInput
+                testID="register-referral-input"
+                style={styles.input}
+                placeholder="Code parrainage (optionnel)"
+                placeholderTextColor="#9CA3AF"
+                value={referralCode}
+                onChangeText={setReferralCode}
+                autoCapitalize="characters"
+              />
             </View>
 
             <TouchableOpacity
