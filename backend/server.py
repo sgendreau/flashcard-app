@@ -1153,10 +1153,20 @@ async def seed_data():
             "name": "Admin", "role": "admin", "xp": 0, "level": 1,
             "streak_count": 0, "last_study_date": None, "badges": [],
             "grade_level": None, "notification_enabled": True, "notification_hour": 18,
+            "referral_code": generate_referral_code(), "referred_by": None, "referral_count": 0,
             "created_at": datetime.now(timezone.utc),
         })
-    elif not verify_password(admin_password, existing["password_hash"]):
-        await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_password)}})
+    else:
+        # Update existing admin: password if changed, add referral_code if missing
+        updates = {}
+        if not verify_password(admin_password, existing["password_hash"]):
+            updates["password_hash"] = hash_password(admin_password)
+        if not existing.get("referral_code"):
+            updates["referral_code"] = generate_referral_code()
+        if "referral_count" not in existing:
+            updates["referral_count"] = 0
+        if updates:
+            await db.users.update_one({"email": admin_email}, {"$set": updates})
 
     for subj in SUBJECTS_SEED:
         await db.subjects.update_one({"id": subj["id"]}, {"$set": subj}, upsert=True)

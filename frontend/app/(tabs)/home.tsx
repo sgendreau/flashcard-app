@@ -47,7 +47,15 @@ export default function HomeScreen() {
       setSubjects(data.subjects || []);
       if (data.grade_levels) setAllGrades(data.grade_levels);
       await refreshUser();
-    } catch (e) { console.log('Error:', e); }
+      // Cache for offline
+      try { await cacheSubjects(data.subjects || []); } catch {}
+    } catch (e) {
+      console.log('Error fetching, trying cache:', e);
+      try {
+        const cached = await getCachedSubjects();
+        if (cached.length) setSubjects(cached);
+      } catch {}
+    }
     finally { setLoading(false); setRefreshing(false); }
   };
 
