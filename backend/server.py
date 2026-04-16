@@ -24,6 +24,17 @@ db = client[os.environ['DB_NAME']]
 
 JWT_ALGORITHM = "HS256"
 GRADE_LEVELS = ["6eme", "5eme", "4eme", "3eme", "2nde", "1ere", "terminale"]
+GRADE_ORDER = {g: i for i, g in enumerate(GRADE_LEVELS)}  # 6eme=0 ... terminale=6
+
+def grades_from_min(min_grade: str) -> list:
+    """Return all grades from min_grade up to terminale."""
+    idx = GRADE_ORDER.get(min_grade, 0)
+    return GRADE_LEVELS[idx:]
+
+def grades_up_to(user_grade: str) -> list:
+    """Return all grades from 6eme up to user_grade (inclusive)."""
+    idx = GRADE_ORDER.get(user_grade, 6)
+    return GRADE_LEVELS[:idx + 1]
 
 def get_jwt_secret():
     return os.environ["JWT_SECRET"]
@@ -252,10 +263,11 @@ async def get_subjects(request: Request, grade: Optional[str] = Query(None)):
     for s in subjects:
         query = {"subject_id": s["id"]}
         if user_grade:
-            query["grade_levels"] = user_grade
+            # Show cards whose min_grade <= user's grade (i.e. any grade in grades_up_to is in card's grade_levels)
+            applicable = grades_up_to(user_grade)
+            query["grade_levels"] = {"$in": applicable}
         count = await db.flashcards.count_documents(query)
         s["card_count"] = count
-    # Filter out subjects with 0 cards if grade filter is active
     if user_grade:
         subjects = [s for s in subjects if s["card_count"] > 0]
     return {"subjects": subjects, "grade_levels": GRADE_LEVELS}
@@ -296,7 +308,8 @@ async def start_study(subject_id: str, request: Request, grade: Optional[str] = 
 
     query = {"subject_id": subject_id}
     if user_grade:
-        query["grade_levels"] = user_grade
+        applicable = grades_up_to(user_grade)
+        query["grade_levels"] = {"$in": applicable}
 
     all_cards = await db.flashcards.find(query, {"_id": 0}).to_list(500)
     if not all_cards:
@@ -1086,61 +1099,62 @@ ALL_GRADES = GRADE_LEVELS
 COLLEGE = ["6eme", "5eme", "4eme", "3eme"]
 LYCEE = ["2nde", "1ere", "terminale"]
 
+# grade_levels = grades from min_grade to terminale (inclusive)
 FLASHCARDS_SEED = [
     # Maths
-    {"id": "m1", "subject_id": "maths", "question": "Théorème de Pythagore", "answer": "Dans un triangle rectangle, a² + b² = c²", "grade_levels": COLLEGE},
-    {"id": "m2", "subject_id": "maths", "question": "Identité remarquable (a+b)²", "answer": "(a+b)² = a² + 2ab + b²", "grade_levels": ["3eme", "2nde", "1ere"]},
-    {"id": "m3", "subject_id": "maths", "question": "Aire d'un cercle", "answer": "A = πr² où r est le rayon", "grade_levels": COLLEGE},
-    {"id": "m4", "subject_id": "maths", "question": "PGCD", "answer": "Plus Grand Commun Diviseur de deux entiers", "grade_levels": ["5eme", "4eme", "3eme"]},
-    {"id": "m5", "subject_id": "maths", "question": "Fonction affine", "answer": "f(x) = ax + b, droite de pente a", "grade_levels": ["3eme", "2nde"]},
+    {"id": "m1", "subject_id": "maths", "question": "Théorème de Pythagore", "answer": "Dans un triangle rectangle, a² + b² = c²", "grade_levels": grades_from_min("6eme")},
+    {"id": "m2", "subject_id": "maths", "question": "Identité remarquable (a+b)²", "answer": "(a+b)² = a² + 2ab + b²", "grade_levels": grades_from_min("3eme")},
+    {"id": "m3", "subject_id": "maths", "question": "Aire d'un cercle", "answer": "A = πr² où r est le rayon", "grade_levels": grades_from_min("6eme")},
+    {"id": "m4", "subject_id": "maths", "question": "PGCD", "answer": "Plus Grand Commun Diviseur de deux entiers", "grade_levels": grades_from_min("5eme")},
+    {"id": "m5", "subject_id": "maths", "question": "Fonction affine", "answer": "f(x) = ax + b, droite de pente a", "grade_levels": grades_from_min("3eme")},
     # Français
-    {"id": "f1", "subject_id": "francais", "question": "Métaphore", "answer": "Comparaison sans outil de comparaison", "grade_levels": ALL_GRADES},
-    {"id": "f2", "subject_id": "francais", "question": "Oxymore", "answer": "Association de deux termes contraires. Ex: 'obscure clarté'", "grade_levels": ["3eme"] + LYCEE},
-    {"id": "f3", "subject_id": "francais", "question": "Alexandrin", "answer": "Vers de 12 syllabes", "grade_levels": ALL_GRADES},
-    {"id": "f4", "subject_id": "francais", "question": "Champ lexical", "answer": "Ensemble de mots d'un même thème", "grade_levels": ALL_GRADES},
-    {"id": "f5", "subject_id": "francais", "question": "Hyperbole", "answer": "Exagération pour frapper l'esprit", "grade_levels": ALL_GRADES},
+    {"id": "f1", "subject_id": "francais", "question": "Métaphore", "answer": "Comparaison sans outil de comparaison", "grade_levels": grades_from_min("6eme")},
+    {"id": "f2", "subject_id": "francais", "question": "Oxymore", "answer": "Association de deux termes contraires. Ex: 'obscure clarté'", "grade_levels": grades_from_min("3eme")},
+    {"id": "f3", "subject_id": "francais", "question": "Alexandrin", "answer": "Vers de 12 syllabes", "grade_levels": grades_from_min("6eme")},
+    {"id": "f4", "subject_id": "francais", "question": "Champ lexical", "answer": "Ensemble de mots d'un même thème", "grade_levels": grades_from_min("6eme")},
+    {"id": "f5", "subject_id": "francais", "question": "Hyperbole", "answer": "Exagération pour frapper l'esprit", "grade_levels": grades_from_min("6eme")},
     # Histoire-Géo
-    {"id": "h1", "subject_id": "histoire_geo", "question": "Révolution française", "answer": "1789 — Fin de la monarchie absolue", "grade_levels": ALL_GRADES},
-    {"id": "h2", "subject_id": "histoire_geo", "question": "Première Guerre mondiale", "answer": "1914-1918 — Conflit mondial, 10M de morts", "grade_levels": ["3eme"] + LYCEE},
-    {"id": "h3", "subject_id": "histoire_geo", "question": "Débarquement en Normandie", "answer": "6 juin 1944 (Jour J)", "grade_levels": ["3eme"] + LYCEE},
-    {"id": "h4", "subject_id": "histoire_geo", "question": "Les Trente Glorieuses", "answer": "Croissance économique 1945-1975", "grade_levels": LYCEE},
-    {"id": "h5", "subject_id": "histoire_geo", "question": "La mondialisation", "answer": "Intégration mondiale des marchés et sociétés", "grade_levels": LYCEE},
+    {"id": "h1", "subject_id": "histoire_geo", "question": "Révolution française", "answer": "1789 — Fin de la monarchie absolue", "grade_levels": grades_from_min("6eme")},
+    {"id": "h2", "subject_id": "histoire_geo", "question": "Première Guerre mondiale", "answer": "1914-1918 — Conflit mondial, 10M de morts", "grade_levels": grades_from_min("3eme")},
+    {"id": "h3", "subject_id": "histoire_geo", "question": "Débarquement en Normandie", "answer": "6 juin 1944 (Jour J)", "grade_levels": grades_from_min("3eme")},
+    {"id": "h4", "subject_id": "histoire_geo", "question": "Les Trente Glorieuses", "answer": "Croissance économique 1945-1975", "grade_levels": grades_from_min("2nde")},
+    {"id": "h5", "subject_id": "histoire_geo", "question": "La mondialisation", "answer": "Intégration mondiale des marchés et sociétés", "grade_levels": grades_from_min("2nde")},
     # SVT
-    {"id": "s1", "subject_id": "svt", "question": "Photosynthèse", "answer": "CO₂ + eau → glucose + O₂ (lumière)", "grade_levels": ALL_GRADES},
-    {"id": "s2", "subject_id": "svt", "question": "ADN", "answer": "Molécule de l'information génétique, double hélice", "grade_levels": ["3eme"] + LYCEE},
-    {"id": "s3", "subject_id": "svt", "question": "Mitose", "answer": "Division cellulaire → 2 cellules identiques", "grade_levels": ["3eme"] + LYCEE},
-    {"id": "s4", "subject_id": "svt", "question": "Tectonique des plaques", "answer": "Mouvement des plaques lithosphériques", "grade_levels": COLLEGE},
-    {"id": "s5", "subject_id": "svt", "question": "Écosystème", "answer": "Communauté vivante + environnement physique", "grade_levels": ALL_GRADES},
+    {"id": "s1", "subject_id": "svt", "question": "Photosynthèse", "answer": "CO₂ + eau → glucose + O₂ (lumière)", "grade_levels": grades_from_min("6eme")},
+    {"id": "s2", "subject_id": "svt", "question": "ADN", "answer": "Molécule de l'information génétique, double hélice", "grade_levels": grades_from_min("3eme")},
+    {"id": "s3", "subject_id": "svt", "question": "Mitose", "answer": "Division cellulaire → 2 cellules identiques", "grade_levels": grades_from_min("3eme")},
+    {"id": "s4", "subject_id": "svt", "question": "Tectonique des plaques", "answer": "Mouvement des plaques lithosphériques", "grade_levels": grades_from_min("6eme")},
+    {"id": "s5", "subject_id": "svt", "question": "Écosystème", "answer": "Communauté vivante + environnement physique", "grade_levels": grades_from_min("6eme")},
     # Physique-Chimie
-    {"id": "p1", "subject_id": "physique_chimie", "question": "Loi d'Ohm", "answer": "U = R × I", "grade_levels": ["4eme", "3eme", "2nde"]},
-    {"id": "p2", "subject_id": "physique_chimie", "question": "Énergie cinétique", "answer": "Ec = ½mv²", "grade_levels": LYCEE},
-    {"id": "p3", "subject_id": "physique_chimie", "question": "Atome", "answer": "Noyau (protons+neutrons) + électrons", "grade_levels": ALL_GRADES},
-    {"id": "p4", "subject_id": "physique_chimie", "question": "Vitesse de la lumière", "answer": "c ≈ 3×10⁸ m/s", "grade_levels": ["4eme", "3eme"] + LYCEE},
-    {"id": "p5", "subject_id": "physique_chimie", "question": "pH", "answer": "<7 acide, =7 neutre, >7 basique", "grade_levels": ["3eme"] + LYCEE},
+    {"id": "p1", "subject_id": "physique_chimie", "question": "Loi d'Ohm", "answer": "U = R × I", "grade_levels": grades_from_min("4eme")},
+    {"id": "p2", "subject_id": "physique_chimie", "question": "Énergie cinétique", "answer": "Ec = ½mv²", "grade_levels": grades_from_min("2nde")},
+    {"id": "p3", "subject_id": "physique_chimie", "question": "Atome", "answer": "Noyau (protons+neutrons) + électrons", "grade_levels": grades_from_min("6eme")},
+    {"id": "p4", "subject_id": "physique_chimie", "question": "Vitesse de la lumière", "answer": "c ≈ 3×10⁸ m/s", "grade_levels": grades_from_min("4eme")},
+    {"id": "p5", "subject_id": "physique_chimie", "question": "pH", "answer": "<7 acide, =7 neutre, >7 basique", "grade_levels": grades_from_min("3eme")},
     # Anglais
-    {"id": "a1", "subject_id": "anglais", "question": "Present Perfect", "answer": "Have/Has + past participle", "grade_levels": ALL_GRADES},
-    {"id": "a2", "subject_id": "anglais", "question": "Conditional (2nd)", "answer": "If + past simple, would + verb", "grade_levels": ["3eme"] + LYCEE},
-    {"id": "a3", "subject_id": "anglais", "question": "To look forward to", "answer": "Attendre avec impatience", "grade_levels": ALL_GRADES},
-    {"id": "a4", "subject_id": "anglais", "question": "Passive voice", "answer": "Subject + be + past participle", "grade_levels": ["4eme", "3eme"] + LYCEE},
-    {"id": "a5", "subject_id": "anglais", "question": "Since vs For", "answer": "Since = point. For = durée", "grade_levels": ALL_GRADES},
-    # Philosophie (Terminale only)
-    {"id": "ph1", "subject_id": "philosophie", "question": "Cogito ergo sum", "answer": "Je pense donc je suis — Descartes", "grade_levels": ["terminale"]},
-    {"id": "ph2", "subject_id": "philosophie", "question": "L'allégorie de la caverne", "answer": "Platon — Ombres vs réalité", "grade_levels": ["terminale"]},
-    {"id": "ph3", "subject_id": "philosophie", "question": "L'impératif catégorique", "answer": "Kant — Maxime érigeable en loi universelle", "grade_levels": ["terminale"]},
-    {"id": "ph4", "subject_id": "philosophie", "question": "Le contrat social", "answer": "Rousseau — Liberté contre protection", "grade_levels": ["terminale"]},
-    {"id": "ph5", "subject_id": "philosophie", "question": "L'existentialisme", "answer": "Sartre — L'existence précède l'essence", "grade_levels": ["terminale"]},
-    # SES
-    {"id": "se1", "subject_id": "ses", "question": "PIB", "answer": "Produit Intérieur Brut — Richesse annuelle", "grade_levels": ["2nde", "1ere", "terminale"]},
-    {"id": "se2", "subject_id": "ses", "question": "Inflation", "answer": "Hausse générale et durable des prix", "grade_levels": ["2nde", "1ere", "terminale"]},
-    {"id": "se3", "subject_id": "ses", "question": "Loi offre/demande", "answer": "Demande↑→prix↑, Offre↑→prix↓", "grade_levels": ["2nde", "1ere", "terminale"]},
-    {"id": "se4", "subject_id": "ses", "question": "Mobilité sociale", "answer": "Changement de position entre générations", "grade_levels": ["1ere", "terminale"]},
-    {"id": "se5", "subject_id": "ses", "question": "Mondialisation économique", "answer": "Intégration des économies nationales", "grade_levels": ["terminale"]},
+    {"id": "a1", "subject_id": "anglais", "question": "Present Perfect", "answer": "Have/Has + past participle", "grade_levels": grades_from_min("6eme")},
+    {"id": "a2", "subject_id": "anglais", "question": "Conditional (2nd)", "answer": "If + past simple, would + verb", "grade_levels": grades_from_min("3eme")},
+    {"id": "a3", "subject_id": "anglais", "question": "To look forward to", "answer": "Attendre avec impatience", "grade_levels": grades_from_min("6eme")},
+    {"id": "a4", "subject_id": "anglais", "question": "Passive voice", "answer": "Subject + be + past participle", "grade_levels": grades_from_min("4eme")},
+    {"id": "a5", "subject_id": "anglais", "question": "Since vs For", "answer": "Since = point. For = durée", "grade_levels": grades_from_min("6eme")},
+    # Philosophie (Terminale min)
+    {"id": "ph1", "subject_id": "philosophie", "question": "Cogito ergo sum", "answer": "Je pense donc je suis — Descartes", "grade_levels": grades_from_min("terminale")},
+    {"id": "ph2", "subject_id": "philosophie", "question": "L'allégorie de la caverne", "answer": "Platon — Ombres vs réalité", "grade_levels": grades_from_min("terminale")},
+    {"id": "ph3", "subject_id": "philosophie", "question": "L'impératif catégorique", "answer": "Kant — Maxime érigeable en loi universelle", "grade_levels": grades_from_min("terminale")},
+    {"id": "ph4", "subject_id": "philosophie", "question": "Le contrat social", "answer": "Rousseau — Liberté contre protection", "grade_levels": grades_from_min("terminale")},
+    {"id": "ph5", "subject_id": "philosophie", "question": "L'existentialisme", "answer": "Sartre — L'existence précède l'essence", "grade_levels": grades_from_min("terminale")},
+    # SES (2nde min)
+    {"id": "se1", "subject_id": "ses", "question": "PIB", "answer": "Produit Intérieur Brut — Richesse annuelle", "grade_levels": grades_from_min("2nde")},
+    {"id": "se2", "subject_id": "ses", "question": "Inflation", "answer": "Hausse générale et durable des prix", "grade_levels": grades_from_min("2nde")},
+    {"id": "se3", "subject_id": "ses", "question": "Loi offre/demande", "answer": "Demande↑→prix↑, Offre↑→prix↓", "grade_levels": grades_from_min("2nde")},
+    {"id": "se4", "subject_id": "ses", "question": "Mobilité sociale", "answer": "Changement de position entre générations", "grade_levels": grades_from_min("1ere")},
+    {"id": "se5", "subject_id": "ses", "question": "Mondialisation économique", "answer": "Intégration des économies nationales", "grade_levels": grades_from_min("terminale")},
     # Espagnol
-    {"id": "es1", "subject_id": "espagnol", "question": "Ser vs Estar", "answer": "Ser=permanent, Estar=temporaire", "grade_levels": ALL_GRADES},
-    {"id": "es2", "subject_id": "espagnol", "question": "Pretérito indefinido", "answer": "Passé simple: hablé, hablaste, habló...", "grade_levels": ["4eme", "3eme"] + LYCEE},
-    {"id": "es3", "subject_id": "espagnol", "question": "Gustar", "answer": "Me gusta/gustan = ça me plaît", "grade_levels": ALL_GRADES},
-    {"id": "es4", "subject_id": "espagnol", "question": "Subjuntivo", "answer": "Mode du doute/souhait", "grade_levels": LYCEE},
-    {"id": "es5", "subject_id": "espagnol", "question": "Por vs Para", "answer": "Por=cause/durée, Para=but/destination", "grade_levels": ["3eme"] + LYCEE},
+    {"id": "es1", "subject_id": "espagnol", "question": "Ser vs Estar", "answer": "Ser=permanent, Estar=temporaire", "grade_levels": grades_from_min("6eme")},
+    {"id": "es2", "subject_id": "espagnol", "question": "Pretérito indefinido", "answer": "Passé simple: hablé, hablaste, habló...", "grade_levels": grades_from_min("4eme")},
+    {"id": "es3", "subject_id": "espagnol", "question": "Gustar", "answer": "Me gusta/gustan = ça me plaît", "grade_levels": grades_from_min("6eme")},
+    {"id": "es4", "subject_id": "espagnol", "question": "Subjuntivo", "answer": "Mode du doute/souhait", "grade_levels": grades_from_min("2nde")},
+    {"id": "es5", "subject_id": "espagnol", "question": "Por vs Para", "answer": "Por=cause/durée, Para=but/destination", "grade_levels": grades_from_min("3eme")},
 ]
 
 async def seed_data():
