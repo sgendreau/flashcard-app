@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
   reviewQuestion: { fontSize: 15, fontWeight: '700', color: '#1F2937' },
   reviewAnswer: { fontSize: 13, color: '#6B7280', marginTop: 4 },
   homeBtn: {
-    flexDirection: 'row', backgroundColor: '#FF6B35', borderRadius: 16, paddingVertical: 18,
+    flexDirection: 'row', backgroundColor: '#E8594D', borderRadius: 16, paddingVertical: 18,
     alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 8,
   },
   homeBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' },

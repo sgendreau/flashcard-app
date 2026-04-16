@@ -944,7 +944,7 @@ async def get_share_profile(request: Request):
     session_count = await db.study_sessions.count_documents({"user_id": user["_id"]})
     box3 = await db.user_card_progress.count_documents({"user_id": user["_id"], "box": 3})
     text = (
-        f"📚 FlashCards — Mon profil\n"
+        f"📚 Quikko — Mon profil\n"
         f"👤 {user_doc['name']}\n"
         f"⭐ {user_doc.get('xp', 0)} XP • Niveau {user_doc.get('level', 1)}\n"
         f"🔥 {user_doc.get('streak_count', 0)} jours de streak\n"
@@ -963,10 +963,10 @@ async def get_share_session(request: Request):
     xp = body.get("xp_earned", 0)
     emoji = "🏆" if pct == 100 else ("🎉" if pct >= 80 else ("👍" if pct >= 50 else "💪"))
     text = (
-        f"{emoji} FlashCards — Résultat\n"
+        f"{emoji} Quikko — Résultat\n"
         f"📊 Score : {pct}% ({correct}/{total})\n"
         f"⭐ +{xp} XP gagnés\n"
-        f"#FlashCards #Révisions"
+        f"#Quikko #Révisions"
     )
     return {"share_text": text}
 

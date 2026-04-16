@@ -1,27 +1,39 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Quikko brand colors derived from logo
+// Primary: Coral red from the Q logo
+// Dark: #1A1A2E (user preference)
+export const BRAND = {
+  primary: '#E8594D',
+  primaryLight: '#FF7B6F',
+  primaryDark: '#C9403A',
+  dark: '#1A1A2E',
+  darkAlt: '#16213E',
+  darkSurface: '#1E2A45',
+};
+
 export const THEMES = {
   light: {
-    bg: '#F4F6F8', surface: '#FFFFFF', surfaceAlt: '#F9FAFB',
-    text: '#1F2937', textSecondary: '#6B7280', textMuted: '#9CA3AF',
-    border: '#E5E7EB', borderLight: '#F3F4F6',
-    primary: '#FF6B35', primaryBg: '#FFF3ED',
+    bg: '#F5F5FA', surface: '#FFFFFF', surfaceAlt: '#F0F0F8',
+    text: '#1A1A2E', textSecondary: '#5C5C7A', textMuted: '#9696AD',
+    border: '#E0E0EF', borderLight: '#F0F0F8',
+    primary: BRAND.primary, primaryBg: '#FFF0EE', primaryLight: BRAND.primaryLight,
     error: '#EF4444', errorBg: '#FEF2F2',
     success: '#10B981', successBg: '#F0FDF4',
     warning: '#F59E0B', warningBg: '#FFF8E1',
-    tabBar: '#FFFFFF', tabBorder: '#E5E7EB',
-    cardShadow: 0.05,
+    tabBar: '#FFFFFF', tabBorder: '#E0E0EF',
+    cardShadow: 0.06,
   },
   dark: {
-    bg: '#0F172A', surface: '#1E293B', surfaceAlt: '#334155',
-    text: '#F1F5F9', textSecondary: '#94A3B8', textMuted: '#64748B',
-    border: '#334155', borderLight: '#1E293B',
-    primary: '#FF8A5C', primaryBg: '#3B1F10',
+    bg: BRAND.dark, surface: BRAND.darkSurface, surfaceAlt: '#263352',
+    text: '#F0F0F8', textSecondary: '#A0A0C0', textMuted: '#6B6B8D',
+    border: '#2A3555', borderLight: '#1E2A45',
+    primary: BRAND.primaryLight, primaryBg: '#3A1F1D', primaryLight: BRAND.primary,
     error: '#F87171', errorBg: '#450A0A',
     success: '#34D399', successBg: '#052E16',
     warning: '#FBBF24', warningBg: '#451A03',
-    tabBar: '#1E293B', tabBorder: '#334155',
+    tabBar: BRAND.darkSurface, tabBorder: '#2A3555',
     cardShadow: 0,
   },
 };
@@ -48,15 +60,9 @@ export function ThemeProvider({ children, initialTheme }: { children: ReactNode;
     });
   }, []);
 
-  useEffect(() => {
-    if (initialTheme) setThemeState(initialTheme);
-  }, [initialTheme]);
+  useEffect(() => { if (initialTheme) setThemeState(initialTheme); }, [initialTheme]);
 
-  const setTheme = (t: ThemeName) => {
-    setThemeState(t);
-    AsyncStorage.setItem('app_theme', t);
-  };
-
+  const setTheme = (t: ThemeName) => { setThemeState(t); AsyncStorage.setItem('app_theme', t); };
   const toggleTheme = () => setTheme(theme === 'light' ? 'dark' : 'light');
 
   return (

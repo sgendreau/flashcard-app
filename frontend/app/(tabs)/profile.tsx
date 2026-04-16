@@ -202,7 +202,7 @@ export default function ProfileScreen() {
             </View>
             <TouchableOpacity testID="share-referral-btn" style={[st.shareBtn, { marginTop: 12 }]}
               onPress={async () => {
-                const msg = `Rejoins-moi sur FlashCards ! Utilise mon code ${referralStats.referral_code} à l'inscription et on gagne chacun 100 XP ! 📚✨`;
+                const msg = `Rejoins-moi sur Quikko ! Utilise mon code ${referralStats.referral_code} à l'inscription et on gagne chacun 100 XP ! ⚡📚`;
                 try { await Share.share({ message: msg }); } catch {}
               }}>
               <Ionicons name="gift-outline" size={18} color="#3B82F6" />
