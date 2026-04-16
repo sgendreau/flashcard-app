@@ -16,6 +16,7 @@ function InnerLayout() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="study" />
         <Stack.Screen name="class" />
+        <Stack.Screen name="onboarding" options={{ gestureEnabled: false }} />
         <Stack.Screen name="create-card" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="ai-generate" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
       </Stack>

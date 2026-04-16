@@ -89,7 +89,7 @@ const s = StyleSheet.create({
   flex: { flex: 1 },
   scroll: { flexGrow: 1, justifyContent: 'center', padding: 24 },
   header: { alignItems: 'center', marginBottom: 32 },
-  logo: { width: 80, height: 80, borderRadius: 20, marginBottom: 10 },
+  logo: { width: 160, height: 87, borderRadius: 16, marginBottom: 10 },
   title: { fontSize: 32, fontWeight: '900', color: '#E8594D', letterSpacing: 1 },
   subtitle: { fontSize: 15, color: '#A0A0C0', marginTop: 4 },
   form: { backgroundColor: '#1E2A45', borderRadius: 24, padding: 24 },
