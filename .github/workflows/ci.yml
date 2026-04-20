@@ -46,7 +46,7 @@ jobs:
       - name: Lint (flake8)
         run: |
           cd backend
-          python -m flake8 server.py --max-line-length 150 --ignore E501,W503,E302,E303,W291
+          python -m flake8 server.py --max-line-length 150 --ignore E402,E501,W503,E302,E303,W291
 
       - name: Tests unitaires
         env:

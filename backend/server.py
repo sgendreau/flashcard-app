@@ -14,7 +14,7 @@ import bcrypt
 import jwt
 import string
 from datetime import datetime, timezone, timedelta
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import List, Optional
 import random
 
@@ -147,6 +147,7 @@ class ImportDeckInput(BaseModel):
 class UpdateThemeInput(BaseModel):
     theme: str  # "light" or "dark"
 
+
 DAILY_REWARD_XP = [25, 50, 75, 100, 150, 200, 300]  # Day 1-7 cycle
 
 WEEKLY_CHALLENGES = [
@@ -159,6 +160,7 @@ WEEKLY_CHALLENGES = [
 def get_week_start():
     today = datetime.now(timezone.utc).date()
     return today - timedelta(days=today.weekday())
+
 
 # ─── APP SETUP ───
 app = FastAPI()
@@ -383,8 +385,7 @@ async def submit_study(input: SubmitStudyInput, request: Request):
                 "subject_id": input.subject_id, "box": new_box,
                 "last_shown_side": new_shown,
                 "last_reviewed": datetime.now(timezone.utc),
-            },
-            "$inc": {
+            }, "$inc": {
                 "times_correct": 1 if r.is_correct else 0,
                 "times_incorrect": 0 if r.is_correct else 1,
             }},

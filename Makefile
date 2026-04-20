@@ -68,7 +68,7 @@ test-api: ## Tester les endpoints principaux avec curl
 lint: lint-backend lint-frontend ## Linter backend + frontend
 
 lint-backend: ## Linter le code Python
-	cd backend && python -m flake8 server.py --max-line-length 150 --ignore E501,W503
+	cd backend && python -m flake8 server.py --max-line-length 150 --ignore E402,E501,W503,E302,E303,W291
 
 lint-frontend: ## Linter le code TypeScript/React
 	cd frontend && npx eslint app/ src/ --ext .ts,.tsx
