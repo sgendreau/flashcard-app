@@ -35,11 +35,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: yarn
-          cache-dependency-path: frontend/yarn.lock
 
       - name: Installer les dépendances
-        run: cd frontend && yarn install --frozen-lockfile
+        run: cd frontend && yarn install
 
       - name: Installer EAS CLI
         run: npm install -g eas-cli
