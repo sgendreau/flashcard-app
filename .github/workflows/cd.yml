@@ -1,0 +1,126 @@
+# ============================================
+#  Quikko — CD : Build & Deploy Expo (EAS)
+#  Se déclenche sur push vers main uniquement
+# ============================================
+name: CD — Build & Deploy
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - ".github/workflows/ci.yml"
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+jobs:
+  # ───────────────────────────────────────────
+  #  Build Expo (EAS Build)
+  # ───────────────────────────────────────────
+  build:
+    name: EAS Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: [android, ios]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Installer les dépendances
+        run: cd frontend && yarn install --frozen-lockfile
+
+      - name: Installer EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Configurer le .env de production
+        run: |
+          cat > frontend/.env << EOF
+          EXPO_PUBLIC_BACKEND_URL=${{ secrets.PRODUCTION_BACKEND_URL }}
+          EOF
+
+      - name: Build ${{ matrix.platform }}
+        run: |
+          cd frontend
+          eas build \
+            --platform ${{ matrix.platform }} \
+            --profile production \
+            --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+  # ───────────────────────────────────────────
+  #  Déployer le backend (Docker)
+  # ───────────────────────────────────────────
+  deploy-backend:
+    name: Deploy Backend
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build -t quikko-backend:${{ github.sha }} -f backend/Dockerfile backend/
+
+      - name: Push to registry
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+          docker tag quikko-backend:${{ github.sha }} ${{ secrets.DOCKER_REGISTRY }}/quikko-backend:${{ github.sha }}
+          docker tag quikko-backend:${{ github.sha }} ${{ secrets.DOCKER_REGISTRY }}/quikko-backend:latest
+          docker push ${{ secrets.DOCKER_REGISTRY }}/quikko-backend:${{ github.sha }}
+          docker push ${{ secrets.DOCKER_REGISTRY }}/quikko-backend:latest
+
+      # Adapter cette étape selon votre hébergeur (Railway, Render, VPS, etc.)
+      - name: Déployer sur le serveur
+        run: |
+          echo "🚀 Image pushed: ${{ secrets.DOCKER_REGISTRY }}/quikko-backend:${{ github.sha }}"
+          echo "Adaptez cette étape à votre hébergeur (Railway, Render, AWS, etc.)"
+
+  # ───────────────────────────────────────────
+  #  Soumettre aux stores (EAS Submit)
+  # ───────────────────────────────────────────
+  submit:
+    name: EAS Submit
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+
+    strategy:
+      matrix:
+        platform: [android, ios]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Installer EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Submit ${{ matrix.platform }}
+        run: |
+          cd frontend
+          eas submit \
+            --platform ${{ matrix.platform }} \
+            --latest \
+            --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          # iOS : EXPO_APPLE_ID, EXPO_APPLE_PASSWORD via secrets
+          # Android : EXPO_ANDROID_KEYSTORE via secrets
