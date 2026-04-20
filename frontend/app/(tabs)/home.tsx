@@ -249,7 +249,7 @@ export default function HomeScreen() {
         <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 16 }]}>
           {gradeFilter ? `Matières (${GRADE_LABELS[gradeFilter]})` : 'Toutes les matières'}
         </Text>
-        <View style={[styles.subjectsGrid, isTablet && { flexDirection: 'row', flexWrap: 'wrap' }]}>
+        <View style={[styles.subjectsGrid, isTablet && styles.subjectsGridTablet]}>
           {subjects.map((subject) => (
             <View key={subject.id} style={[styles.subjectCard, { backgroundColor: colors.surface, borderLeftColor: subject.color }, isTablet && { width: '48%' }]}>
               <TouchableOpacity testID={`subject-card-${subject.id}`} style={styles.subjectTouch}
@@ -321,8 +321,9 @@ const styles = StyleSheet.create({
   gradeText: { fontSize: 14, fontWeight: '600' },
   importBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12, alignSelf: 'flex-start' },
   importBtnText: { fontSize: 13, fontWeight: '600' },
-  subjectsGrid: { gap: 12, flexWrap: 'wrap' },
-  subjectCard: { borderRadius: 16, borderLeftWidth: 4 },
+  subjectsGrid: { gap: 12, width: '100%' },
+  subjectsGridTablet: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  subjectCard: { borderRadius: 16, borderLeftWidth: 4, width: '100%' },
   subjectTouch: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 14 },
   subjectIcon: { width: 52, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   subjectInfo: { flex: 1 },
