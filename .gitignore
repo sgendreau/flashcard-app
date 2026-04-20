@@ -92,3 +92,12 @@ credentials.json
 
 # Exception: keep .env.example in repo
 !.env.example
+-e 
+# Environment and credential files
+.env
+.env.*
+*.env
+credentials.json
+*.pem
+*.key
+.credentials
