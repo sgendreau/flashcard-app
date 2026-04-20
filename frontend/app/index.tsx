@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Animated, StyleSheet, Image, Text } from 'react-native';
+import { Animated, StyleSheet, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../src/context/AuthContext';
@@ -40,6 +40,7 @@ export default function Index() {
       // 5. Wait then navigate
       Animated.delay(600),
     ]).start(() => setShowSplash(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -55,6 +56,7 @@ export default function Index() {
       }
     };
     navigate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showSplash, user, loading]);
 
   const bgColor = bgFlash.interpolate({

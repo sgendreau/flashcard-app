@@ -62,7 +62,7 @@ export default function AIGenerateScreen() {
             <TouchableOpacity testID="ai-close-btn" onPress={() => router.back()} style={[s.closeBtn, { backgroundColor: colors.surface }]}>
               <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
-            <Text style={[s.title, { color: colors.text }]}>Générer avec l'IA</Text>
+            <Text style={[s.title, { color: colors.text }]}>Générer avec l{"'"}IA</Text>
             <Ionicons name="sparkles" size={24} color={colors.primary} />
           </View>
 
@@ -71,7 +71,7 @@ export default function AIGenerateScreen() {
               <Ionicons name="sparkles" size={28} color={colors.primary} />
               <View style={{ flex: 1 }}>
                 <Text style={[s.aiTitle, { color: colors.text }]}>Claude Sonnet</Text>
-                <Text style={[s.aiDesc, { color: colors.textSecondary }]}>Colle un texte de cours et l'IA génère des flashcards automatiquement</Text>
+                <Text style={[s.aiDesc, { color: colors.textSecondary }]}>Colle un texte de cours et l{"'"}IA génère des flashcards automatiquement</Text>
               </View>
             </View>
           </View>

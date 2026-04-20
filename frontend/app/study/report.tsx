@@ -148,7 +148,7 @@ export default function ReportScreen() {
           activeOpacity={0.8}
         >
           <Ionicons name="home" size={20} color="#fff" />
-          <Text style={styles.homeBtnText}>Retour à l'accueil</Text>
+          <Text style={styles.homeBtnText}>Retour à l{"'"}accueil</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

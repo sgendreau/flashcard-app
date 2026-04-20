@@ -72,7 +72,7 @@ export default function RegisterScreen() {
                 value={referralCode} onChangeText={setReferralCode} autoCapitalize="characters" />
             </View>
             <TouchableOpacity testID="register-submit-btn" style={[s.btn, loading && s.btnDis]} onPress={handleRegister} disabled={loading} activeOpacity={0.8}>
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.btnText}>S'inscrire</Text>}
+              {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.btnText}>S{"'"}inscrire</Text>}
             </TouchableOpacity>
             <TouchableOpacity testID="register-go-login" style={s.linkWrap} onPress={() => router.back()}>
               <Text style={s.linkText}>Déjà un compte ? <Text style={s.linkBold}>Se connecter</Text></Text>

@@ -45,6 +45,7 @@ export default function ProfileScreen() {
     finally { setLoading(false); setRefreshing(false); }
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useFocusEffect(useCallback(() => { fetchStats(); setNotifEnabled(user?.notification_enabled ?? true); }, []));
 
   const handleLogout = async () => { await logout(); router.replace('/(auth)/login'); };

@@ -62,7 +62,7 @@ export default function LoginScreen() {
               {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.btnText}>Se connecter</Text>}
             </TouchableOpacity>
             <TouchableOpacity testID="login-go-register" style={s.linkWrap} onPress={() => router.push('/(auth)/register')}>
-              <Text style={s.linkText}>Pas encore de compte ? <Text style={s.linkBold}>S'inscrire</Text></Text>
+              <Text style={s.linkText}>Pas encore de compte ? <Text style={s.linkBold}>S{"'"}inscrire</Text></Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

@@ -32,6 +32,7 @@ export default function ClassDetailScreen() {
     finally { setLoading(false); }
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchAll(); }, [classId]);
 
   const copyCode = async () => {

@@ -11,7 +11,7 @@ import { useTheme } from '../../src/context/ThemeContext';
 import { useResponsive } from '../../src/utils/responsive';
 import { api } from '../../src/utils/api';
 import * as Clipboard from 'expo-clipboard';
-import { cacheSubjects, getCachedSubjects, cacheFlashcards } from '../../src/utils/offlineCache';
+import { cacheSubjects, getCachedSubjects } from '../../src/utils/offlineCache';
 
 const SUBJECT_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   'calculator-outline': 'calculator-outline', 'book-outline': 'book-outline',
@@ -31,7 +31,7 @@ interface Subject { id: string; name: string; icon: string; color: string; descr
 export default function HomeScreen() {
   const { user, refreshUser } = useAuth();
   const { colors } = useTheme();
-  const { isTablet, columns } = useResponsive();
+  const { isTablet } = useResponsive();
   const router = useRouter();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [gradeFilter, setGradeFilter] = useState<string | null>(null);
@@ -62,6 +62,7 @@ export default function HomeScreen() {
   useFocusEffect(useCallback(() => {
     setGradeFilter(user?.grade_level || null);
     fetchData(user?.grade_level || null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.grade_level]));
 
   const toggleGrade = (g: string) => {
