@@ -90,9 +90,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
 
       - name: Installer les dépendances
-        run: cd frontend && yarn install
+        run: cd frontend && yarn install --frozen-lockfile
 
       - name: Lint (eslint)
         run: cd frontend && npx expo lint || echo "Lint warnings (non-blocking)"
