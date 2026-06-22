@@ -2,7 +2,7 @@ import os
 import logging
 from datetime import datetime, timezone
 
-from app.config import GRADE_LEVELS, grades_from_min
+from app.config import grades_from_min
 from app.db import db
 from app.security import hash_password, verify_password
 from app.helpers import generate_referral_code
